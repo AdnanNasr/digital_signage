@@ -208,7 +208,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFEDF5EF),
+                                    color: const Color(0xFFEDF1FC),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: Icon(
@@ -378,7 +378,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                               height: 56,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEDF5EF),
+                                color: const Color(0xFFEDF1FC),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(

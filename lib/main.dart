@@ -11,12 +11,16 @@ class SignageApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const ink = Color(0xFF18322F);
-    const line = Color(0xFFE0E8E4);
+    const ink = Color(0xFF1C2945);
+    const line = Color(0xFFE0E5F1);
     final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF157A65),
-      primary: const Color(0xFF157A65),
+      seedColor: const Color(0xFF3E5DBB),
+      primary: const Color(0xFF3E5DBB),
       onPrimary: Colors.white,
+      secondary: const Color(0xFF876600),
+      onSecondary: Colors.white,
+      secondaryContainer: const Color(0xFFFFF1B7),
+      onSecondaryContainer: const Color(0xFF514000),
       surface: Colors.white,
       onSurface: ink,
       outlineVariant: line,
@@ -34,7 +38,7 @@ class SignageApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: scheme,
-        scaffoldBackgroundColor: const Color(0xFFF3F6F4),
+        scaffoldBackgroundColor: const Color(0xFFF4F6FB),
         textTheme: const TextTheme(
           headlineLarge: TextStyle(
             fontSize: 36,
@@ -102,7 +106,7 @@ class SignageApp extends StatelessWidget {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFFF8FAF9),
+          fillColor: const Color(0xFFF8F9FD),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 20,
@@ -116,7 +120,7 @@ class SignageApp extends StatelessWidget {
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
-          indicatorColor: const Color(0xFFE1F2EB),
+          indicatorColor: const Color(0xFFE8EDFC),
           height: 76,
         ),
         dialogTheme: DialogThemeData(
@@ -127,7 +131,7 @@ class SignageApp extends StatelessWidget {
           ),
         ),
         progressIndicatorTheme: const ProgressIndicatorThemeData(
-          linearTrackColor: Color(0xFFE1EEE7),
+          linearTrackColor: Color(0xFFE4EAF8),
           borderRadius: BorderRadius.all(Radius.circular(8)),
         ),
         dividerTheme: const DividerThemeData(
