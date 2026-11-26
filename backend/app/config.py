@@ -42,6 +42,7 @@ class Settings:
     max_upload_bytes: int = 512 * 1024 * 1024
     ffprobe_binary: str = "ffprobe"
     allowed_origins: tuple[str, ...] = ("http://localhost:8080", "http://127.0.0.1:8080")
+    playlists_file: Path | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -62,4 +63,6 @@ class Settings:
             max_upload_bytes=max_upload_mb * 1024 * 1024,
             ffprobe_binary=os.environ.get("SIGNAGE_FFPROBE_BINARY", "ffprobe"),
             allowed_origins=get_allowed_origins(),
+            playlists_file=Path(os.environ["SIGNAGE_PLAYLISTS_FILE"]).resolve()
+            if os.environ.get("SIGNAGE_PLAYLISTS_FILE") else None,
         )

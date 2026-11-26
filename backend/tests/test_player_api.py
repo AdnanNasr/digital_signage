@@ -47,6 +47,8 @@ class ApiTests(ApiFixture):
         response = self.client.options("/api/player/start", headers=headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["access-control-allow-origin"], "http://localhost:8080")
+        headers["Access-Control-Request-Method"] = "PUT"
+        self.assertEqual(self.client.options("/api/playlists/selected", headers=headers).status_code, 200)
         headers["Origin"] = "https://untrusted.example"
         self.assertEqual(self.client.options("/api/player/start", headers=headers).status_code, 400)
         del self.client.headers["Authorization"]

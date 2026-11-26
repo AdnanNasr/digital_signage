@@ -4,10 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/media_file.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../services/signage_api.dart';
-import '../../services/video_picker.dart';
+import '../../services/media_picker.dart';
+import 'media_thumbnail.dart';
 
-final videoPickerProvider = Provider<Future<VideoUpload?> Function()>(
-  (ref) => pickVideo,
+final mediaPickerProvider = Provider<Future<MediaUpload?> Function()>(
+  (ref) => pickMedia,
 );
 
 class MediaPage extends ConsumerStatefulWidget {
@@ -23,7 +24,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
   bool _working = false;
   String? _error;
   String? _message;
-  VideoUpload? _upload;
+  MediaUpload? _upload;
   double? _progress;
 
   SignageApi? get _api => ref.read(dashboardProvider.notifier).api;
@@ -71,7 +72,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
     if (_working) return;
     final api = _api;
     if (api == null) return;
-    final choose = ref.read(videoPickerProvider);
+    final choose = ref.read(mediaPickerProvider);
     setState(() {
       _working = true;
       _error = null;
@@ -85,10 +86,12 @@ class _MediaPageState extends ConsumerState<MediaPage> {
         return;
       }
       if (!RegExp(
-        r'\.(mp4|mkv|mov|webm)$',
+        r'\.(jpg|jpeg|png|webp|mp4|mkv|mov|webm)$',
         caseSensitive: false,
       ).hasMatch(file.name)) {
-        throw const ApiException('Erlaubt sind MP4, MKV, MOV und WebM.');
+        throw const ApiException(
+          'Erlaubt sind JPG, PNG, WebP, MP4, MKV, MOV und WebM.',
+        );
       }
       if (file.size == 0) throw const ApiException('Die Datei ist leer.');
       setState(() {
@@ -100,10 +103,21 @@ class _MediaPageState extends ConsumerState<MediaPage> {
       });
       if (!mounted) return;
       setState(() {
-        _message = 'Video erfolgreich hochgeladen.';
+        _message = 'Datei erfolgreich hochgeladen.';
         _files = [
           ..._files,
-          MediaFile(id: file.name, name: file.name, sizeBytes: file.size),
+          MediaFile(
+            id: file.name,
+            name: file.name,
+            sizeBytes: file.size,
+            type:
+                RegExp(
+                  r'\.(jpe?g|png|webp)$',
+                  caseSensitive: false,
+                ).hasMatch(file.name)
+                ? 'image'
+                : 'video',
+          ),
         ]..sort((first, second) => first.name.compareTo(second.name));
       });
       await _load();
@@ -128,7 +142,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Video löschen?'),
+          title: const Text('Datei löschen?'),
           content: Text('„${file.name}“ wird dauerhaft vom Gerät gelöscht.'),
           actions: [
             TextButton(
@@ -153,7 +167,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
       if (!mounted) return;
       setState(() {
         _files = _files.where((item) => item.id != file.id).toList();
-        _message = 'Video erfolgreich gelöscht.';
+        _message = 'Datei erfolgreich gelöscht.';
       });
       ref.read(dashboardProvider.notifier).refresh();
     } on ApiException catch (error) {
@@ -169,7 +183,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100),
+        constraints: const BoxConstraints(maxWidth: 1200),
         child: CustomScrollView(
           slivers: [
             SliverPadding(
@@ -179,31 +193,92 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Ihre Videos',
+                      'MEDIENBIBLIOTHEK',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colors.primary,
+                        letterSpacing: 1.6,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Ihre Medien',
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Videos hinzufügen oder vom Gerät entfernen. MP4, MKV, MOV und WebM werden unterstützt.',
+                      'Ihre Inhalte, übersichtlich organisiert und jederzeit griffbereit.',
                     ),
                     const SizedBox(height: 20),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: _working || _loading
-                              ? null
-                              : _chooseAndUpload,
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text('Video hochladen'),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEDF1FC),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(
+                                    Icons.cloud_upload_outlined,
+                                    color: colors.primary,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Bilder und Videos hinzufügen',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleLarge,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'JPG, PNG, WebP · MP4, MKV, MOV, WebM',
+                                        style: TextStyle(
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: _working || _loading
+                                      ? null
+                                      : _chooseAndUpload,
+                                  icon: const Icon(Icons.upload_file),
+                                  label: const Text('Datei hochladen'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: _working || _loading
+                                      ? null
+                                      : _load,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Dateien aktualisieren'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        OutlinedButton.icon(
-                          onPressed: _working || _loading ? null : _load,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Dateien aktualisieren'),
-                        ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 20),
                     if (_progress != null)
@@ -227,7 +302,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                               Text(
                                 _progress! < 1
                                     ? 'Wird hochgeladen … ${(_progress! * 100).round()} %'
-                                    : 'Video wird geprüft …',
+                                    : 'Datei wird geprüft …',
                               ),
                             ],
                           ),
@@ -261,25 +336,38 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                     const SizedBox(height: 20),
                     if (_loading)
                       const LinearProgressIndicator(
-                        semanticsLabel: 'Videos werden geladen',
+                        semanticsLabel: 'Medien werden geladen',
                       ),
                     if (!_loading && _files.isEmpty && _error == null)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 32),
-                        child: Text(
-                          'Noch keine Videos vorhanden. Laden Sie Ihr erstes Video hoch.',
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.video_library_outlined,
+                                size: 44,
+                                color: colors.primary,
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Noch keine Medien vorhanden. Laden Sie Ihr erstes Bild oder Video hoch.',
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     if (_files.isNotEmpty) ...[
                       Text(
                         _files.length == 1
-                            ? '1 Video'
-                            : '${_files.length} Videos',
+                            ? '1 Datei'
+                            : '${_files.length} Dateien',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Videos aus der laufenden Wiedergabe können erst nach dem Stoppen gelöscht werden.',
+                        'Dateien in Wiedergabelisten müssen vor dem Löschen aus den Listen entfernt werden.',
                       ),
                     ],
                   ],
@@ -292,41 +380,51 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                 itemCount: _files.length,
                 itemBuilder: (context, index) {
                   final file = _files[index];
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Icon(Icons.movie_outlined, color: colors.primary),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Tooltip(
-                                  message: file.name,
-                                  child: Text(
-                                    file.name,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(file.formattedSize),
-                              ],
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            MediaThumbnail(
+                              key: ValueKey(file.id),
+                              file: file,
+                              api: _api,
                             ),
-                          ),
-                          IconButton(
-                            tooltip: '${file.name} löschen',
-                            onPressed: _working || _loading
-                                ? null
-                                : () => _delete(file),
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-                        ],
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Tooltip(
+                                    message: file.name,
+                                    child: Text(
+                                      file.name,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(file.formattedSize),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: '${file.name} löschen',
+                              style: IconButton.styleFrom(
+                                foregroundColor: colors.error,
+                              ),
+                              onPressed: _working || _loading
+                                  ? null
+                                  : () => _delete(file),
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );
