@@ -1,163 +1,66 @@
 # Raspberry Pi Digital Signage
 
-نظام محلي لإدارة شاشة إعلانية، يُنفَّذ تدريجيًا. أُنجز التحكم بالمشغل وإدارة الفيديوهات الأساسية.
-أُضيفت شاشتا Flutter الألمانيتان **Übersicht** للتحكم بالمشغل و**Medien** لإدارة الفيديوهات.
-دعم الصور وقائمة التشغيل الدائمة والنشر مراحل لاحقة.
+لوحة تحكم محلية باللغة الألمانية لإدارة شاشة المحل باستخدام Flutter Web وFastAPI وMPV.
+تدعم الصور والفيديوهات وقوائم تشغيل محفوظة، دون قاعدة بيانات أو خدمات سحابية أثناء الاستخدام.
 
-## المرحلة الأولى
+## الوظائف الحالية
 
-- خادم FastAPI للتحكم بالمشغل عبر MPV JSON IPC مع مصادقة Bearer.
-- عملية MPV واحدة؛ قفل للطلبات المتزامنة وقفل يمنع خادمين من إدارة المشغل نفسه.
-- إعادة استخدام `get_videos` و`get_path` دون تعديل `python_project/main.py` المُجرَّب.
-- ملء الشاشة، تكرار الفيديوهات وتعطيل الصوت كما في المشغل الأصلي.
-- إيقاف الوسائط مع إبقاء نافذة MPV سوداء بواسطة `idle` و`force-window`.
+- **Übersicht:** حالة الاتصال والمشغل، الملف والقائمة الجاري عرضهما، وعدد ملفات الوسائط وأدوات التحكم.
+- **Medien:** رفع الصور والفيديوهات، معاينات صغيرة للصور، عرض الأحجام وحذف الملفات بعد التأكيد.
+- **Wiedergabelisten / Listen:** إنشاء قوائم وتسميتها وتعديل ترتيبها وإزالة عناصرها، وضبط مدة الصور والتكرار، واختيار القائمة المطلوبة وتشغيلها.
+- واجهة متجاوبة، بشعار المحل وألوانه الأزرق والذهبي، مع Riverpod وMaterial 3.
+- عملية MPV واحدة، وتحديث الحالة كل خمس ثوانٍ، واستمرار العرض عند إغلاق المتصفح.
+- عند إيقاف العرض تبقى نافذة MPV سوداء. إيقاف خادم Python نفسه ينهي المشغل الذي يملكه.
 
-```text
-backend/app/config.py             # Environment configuration
-backend/app/main.py               # App lifecycle and authentication
-backend/app/routes/player.py      # Player endpoints
-backend/app/services/player.py    # MPV process ownership and JSON IPC
-backend/app/routes/media.py       # Video management endpoints
-backend/app/services/media.py     # Video validation and storage
-backend/tests/test_player_api.py
-backend/tests/test_media_api.py
-python_project/main.py            # Original player, unchanged
-python_project/videos/            # Existing videos, reused by default
-lib/models/player_status.dart     # Player response model and commands
-lib/services/signage_api.dart     # Shared authenticated API client
-lib/services/video_picker.dart    # Browser file selection and upload progress
-lib/providers/dashboard_provider.dart # Riverpod state and polling
-lib/features/dashboard/dashboard_page.dart # Connection form and overview
-lib/features/media/media_page.dart # Video list, upload and confirmed deletion
-```
+## تشغيل الخادم
 
-## التشغيل على Raspberry Pi
-
-لتنزيل المشروع كاملًا، بما فيه مجلد `python_project` والفيديو الموجود، من المستودع الخاص:
+يلزم Python **3.11 أو أحدث** وMPV وFFmpeg. نفّذ من جذر المشروع بحساب مستخدم الشاشة العادي:
 
 ```bash
 sudo apt update
-sudo apt install git gh
+sudo apt install git gh python3-venv mpv ffmpeg
+```
+
+للتنزيل الأول من المستودع الخاص:
+
+```bash
+cd ~
 gh auth login
 gh repo clone AdnanNasr/digital_signage
 cd digital_signage
-```
-
-لجلب التحديثات لاحقًا، نفّذ `git pull --ff-only` من داخل المشروع.
-بيئة Python وملفات البناء والكاش لا تُرفع؛ تُنشأ على الجهاز باستخدام الخطوات التالية.
-
-يلزم Python 3.11 أو أحدث وجلسة رسومية عاملة. نفّذ من جذر المشروع بحساب مستخدم الشاشة العادي:
-
-```bash
-sudo apt update
-sudo apt install python3-venv mpv ffmpeg
+git switch enhancment
 python3 -m venv backend/.venv
 backend/.venv/bin/python -m pip install -r backend/requirements.txt
 backend/.venv/bin/python backend/run.py
 ```
 
-عند غياب `SIGNAGE_API_TOKEN`، ينشئ الخادم رمزًا آمنًا تلقائيًا في `backend/runtime/api-token`
-بصلاحيات `600` ويعيد استخدامه عند التشغيل التالي. مجلد `runtime` مستبعد من Git.
-لتجربة الطلبات افتح Terminal ثانية في جذر المشروع:
+افتح Terminal من جلسة سطح المكتب المتصلة بالشاشة لتصل MPV إلى العرض.
+لا تشغّل الخادم باستخدام root، ولا تشغّل `python_project/main.py` القديم بالتزامن معه.
+لا تستخدم أكثر من worker أو `--reload` في تشغيل الشاشة.
+
+عند غياب `SIGNAGE_API_TOKEN` ينشئ الخادم كلمة مرور في `backend/runtime/api-token`
+بصلاحيات `600`، ويعيد استخدامها عند التشغيل التالي. لقراءة الكلمة المحلية:
 
 ```bash
-export SIGNAGE_API_TOKEN="$(cat backend/runtime/api-token)"
+cat backend/runtime/api-token
 ```
 
-يمكن تحديد رمز خاص عبر متغير البيئة؛ له الأولوية على الملف ويجب ألا يقل طوله عن 8 أحرف.
-تستخدم لوحة التحكم هذه القيمة كلمةً للمرور في حقل `Passwort`.
-لتغييرها محليًا، أوقف الخادم وعدّل `backend/runtime/api-token` ثم أعد تشغيله.
-الملف مستبعد من Git؛ عيّن كلمة المرور محليًا على الـPi أيضًا عند نقل المشروع.
-إذا حددت `SIGNAGE_RUNTIME_DIR`، يُحفظ الملف في ذلك المجلد.
-لا تشغّل `python_project/main.py` بالتزامن مع الخادم؛ فهو مشغل مستقل عن إدارة الـAPI.
-لا تستخدم `--reload` أو أكثر من worker للشاشة. القفل يمنع خادمين يستخدمان مجلد التشغيل نفسه.
+يمكن تغييرها بتحرير الملف ثم إعادة تشغيل الخادم. إذا عُيّن `SIGNAGE_API_TOKEN`
+فله الأولوية على الملف؛ يجب ألا تقل كلمة المرور عن 8 أحرف.
+كلمة المرور تبقى في ذاكرة جلسة المتصفح فقط ولا تُضمَّن في بناء الواجهة أو Git.
 
-### إعداد التشغيل في IDE
-
-اختر `backend/run.py` ملف التشغيل و`backend/.venv/bin/python` مفسّر Python.
-لا يلزم تعيين رمز يدويًا؛ ملف التشغيل يحدد جذر المشروع تلقائيًا، حتى لو اختلف مجلد العمل.
-يمكن اختيار منفذ آخر بإضافة `--port 8001`.
-
-عند استخدام إعداد Uvicorn أو FastAPI في IDE، عيّن التطبيق إلى `backend.app.main:app`
-ومجلد العمل إلى جذر `digital_signage`، وعطّل reload.
-الأمر المكافئ من جذر المشروع:
+الأمر المكافئ لـ`backend/run.py`، من جذر المشروع:
 
 ```bash
 backend/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-الخطأ `attempted relative import with no known parent package` يحدث عند تحميل
-`backend/app/main.py` باسم مستقل مثل `main:app` أو كملف مباشر؛ الاستيرادات النسبية فيه تحتاج اسم الحزمة الكامل.
-إذا كان خادم سابق يستخدم المنفذ، أوقفه بـ`Ctrl+C` قبل التشغيل مجددًا.
+في IDE اختر `backend/run.py` و`backend/.venv/bin/python`، أو عيّن تطبيق Uvicorn إلى
+`backend.app.main:app` مع جذر المشروع مجلدًا للعمل. يمكن استخدام `--port 8001` مع ملف التشغيل.
 
-| المتغير | الافتراضي | الغرض |
-|---|---|---|
-| `SIGNAGE_API_TOKEN` | رمز محلي يُنشأ تلقائيًا | رمز وصول مخصص اختياري |
-| `SIGNAGE_VIDEOS_DIR` | `python_project/videos` | مجلد الفيديوهات |
-| `SIGNAGE_RUNTIME_DIR` | `backend/runtime` | مجلد خاص لمقبس IPC والقفل |
-| `SIGNAGE_MPV_BINARY` | `mpv` | الملف التنفيذي |
-| `SIGNAGE_MAX_UPLOAD_MB` | `512` | الحد الأقصى للفيديو المرفوع بالميبيبايت (MiB) |
-| `SIGNAGE_FFPROBE_BINARY` | `ffprobe` | أداة فحص الفيديو، تأتي مع FFmpeg |
-| `SIGNAGE_ALLOWED_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | مصادر الواجهة المسموح بها، مفصولة بفاصلة |
+## تشغيل Flutter على الـMac
 
-استخدم مسارًا قصيرًا لمجلد التشغيل بسبب حد طول Unix sockets.
-ترتيب الفيديوهات أبجدي حسب الدالة الأصلية؛ الصيغ MP4 وMKV وMOV وWebM.
-تُستبعد الروابط الرمزية التي تشير خارج مجلد الفيديوهات.
-
-## تجربة API
-
-```bash
-curl http://127.0.0.1:8000/api/health
-curl -H "Authorization: Bearer $SIGNAGE_API_TOKEN" http://127.0.0.1:8000/api/player/status
-curl -X POST -H "Authorization: Bearer $SIGNAGE_API_TOKEN" http://127.0.0.1:8000/api/player/start
-```
-
-| الطريقة | المسار | الوظيفة |
-|---|---|---|
-| GET | `/api/health` | صحة الخادم، دون مصادقة |
-| GET | `/api/player/status` | الحالة والملف الحالي وعدد الفيديوهات |
-| POST | `/api/player/start` | بدء الفيديوهات أو استئناف العرض الحالي دون إعادة تحميله |
-| POST | `/api/player/pause` | إيقاف مؤقت |
-| POST | `/api/player/resume` | استئناف |
-| POST | `/api/player/stop` | إيقاف الوسائط وإبقاء نافذة سوداء |
-| POST | `/api/player/next` | التالي |
-| POST | `/api/player/previous` | السابق |
-| POST | `/api/player/restart` | إعادة تشغيل MPV والفيديوهات من البداية |
-
-مثال للحالة:
-
-```json
-{"state":"playing","label":"Wird wiedergegeben","reachable":true,"current_file":"werbefilm 1 2.mp4","video_count":1}
-```
-
-قيم `state`: `playing`, `paused`, `stopped`, `unreachable`, `error` مع تسمية ألمانية في `label`.
-`reachable` يصف اتصال MPV؛ قبل تشغيله تكون الحالة `stopped` مع `reachable: false`.
-يعيد الخادم `401` للمصادقة، و`409` لغياب الفيديوهات أو التحكم بعرض غير نشط، و`503` لتعذر تشغيل MPV أو الاتصال به.
-
-إغلاق المتصفح لا يوقف العرض. إيقاف خادم API نفسه ينهي MPV الذي يملكه.
-إذا تعطلت MPV يظهر ذلك في الحالة، وطلب `start` التالي يعيد تشغيلها. الاستعادة التلقائية عبر systemd في مرحلة النشر.
-الخادم مربوط حاليًا بـloopback؛ الوصول المحلي وHTTPS عبر Nginx يُجهَّزان في مرحلة النشر، دون تعريض النظام للإنترنت.
-
-## واجهة Flutter — Übersicht وMedien
-
-الواجهة تستخدم Material 3 وRiverpod وHTTP، مع تعريب مكونات Flutter إلى الألمانية.
-تستخدم القائمة الجانبية على الحاسوب وشريط التنقل السفلي على الهاتف، مع ألوان موحّدة
-وبطاقة واضحة للمحتوى الحالي ومؤشرات حالة مميزة. عند تكبير النصوص تتكيف الواجهة لتبقى مقروءة.
-تستند الهوية البصرية إلى الأزرق والذهبي في شعار المحل الموجود في `assets/logo.jpg`،
-ويظهر الشعار في شاشة الدخول والقائمة الجانبية ورأس الواجهة على الهاتف.
-يستمر رفع الفيديو عند تغيير عرض النافذة أو التبديل بين الشاشتين.
-تعرض اتصال الخادم، حالة المشغل، الملف الحالي وعدد الفيديوهات، وتدعم أوامر التشغيل السبعة.
-تتحدث الحالة كل خمس ثوانٍ، وتُعطَّل الأوامر عند انقطاع الاتصال أو أثناء الطلب الجاري.
-رمز الوصول يبقى في ذاكرة الجلسة فقط؛ لا يُحفظ في المتصفح ولا يُضمَّن داخل ملفات البناء.
-تسجيل الخروج أو إغلاق الصفحة لا يوقف MPV.
-
-للتجربة على الـMac، شغّل الخادم في Terminal أولى:
-
-```bash
-backend/.venv/bin/python backend/run.py
-```
-
-في Terminal ثانية من جذر المشروع:
+شغّل الخادم في Terminal أولى، ومن جذر المشروع في Terminal ثانية:
 
 ```bash
 flutter pub get
@@ -165,117 +68,169 @@ flutter run -d chrome --web-hostname 127.0.0.1 --web-port 8080 \
   --dart-define=API_BASE_URL=http://127.0.0.1:8000 --no-web-resources-cdn
 ```
 
-الواجهة على `http://127.0.0.1:8080`، والخادم على `http://127.0.0.1:8000`.
-في شاشة الاتصال استخدم عنوان الخادم، وأدخل كلمة المرور الموجودة في الملف المحلي:
+الواجهة على `http://127.0.0.1:8080`، وعنوان الخادم في شاشة الدخول `http://127.0.0.1:8000`.
+في إعداد Nginx يكون عنوان الواجهة والـAPI واحدًا، مثل `http://192.168.178.157:8080`.
+عند عدم تحديد `API_BASE_URL` تستخدم شاشة الدخول عنوان استضافة الواجهة اقتراحًا للـAPI.
+
+## الصور والوسائط
+
+الصيغ المدعومة: **JPG، JPEG، PNG، WebP، MP4، MKV، MOV، WebM**.
+
+اختر **Medien → Datei hochladen**. يُرفع ملف واحد كل مرة مع شريط تقدم، ثم تظهر
+`Datei wird geprüft …` حتى ينتهي فحصه. الرفع يستمر عند تغيير عرض النافذة والتنقل بين الصفحات،
+ويُلغى عند تسجيل الخروج أو إغلاق الصفحة.
+
+يتحقق FFprobe من حاوية الفيديو ووجود مسار فيديو، وتتحقق Pillow من صحة الصور وصيغتها
+وتفك ترميزها قبل القبول. الصور غير المتحركة حتى **16 مليون بكسل** مدعومة؛ لا تُقبل الصور
+المزيفة أو المقطوعة أو التي لا تطابق امتدادها. المعاينات لا تتجاوز 320×180 وتحافظ على النسب.
+الحد الافتراضي للرفع **512 MiB** لكل ملف ويُطبَّق أثناء النقل، حتى دون `Content-Length`.
+الملفات تُنشر للمشغل بعد اكتمالها وفحصها، ولا تُستبدل أسماء موجودة تلقائيًا.
+
+للتوافق مع النسخة السابقة تبقى الصور والفيديوهات في `python_project/videos` نفسه.
+كود المشغل الأصلي في `python_project/main.py` لم يُعدَّل.
+
+لحذف ملف مستخدم: أزله من جميع القوائم المحفوظة واحفظها، ثم أوقف العرض إذا كان لا يزال ضمن
+القائمة المحملة في MPV. الحذف يحتاج نافذة تأكيد، ولا يحذف تعديل القائمة ملفات الوسائط.
+
+## القوائم واختيار العرض
+
+1. افتح **Wiedergabelisten** على الحاسوب أو **Listen** على الهاتف.
+2. اختر **Neue Liste**، وأدخل اسمًا، ثم أضف الصور والفيديوهات من قائمة **Datei hinzufügen**.
+3. غيّر الترتيب بسهمَي الأعلى والأسفل، أو أزل ملفًا من القائمة بزر ×.
+4. حدد **Bilddauer in Sekunden** بين 1 و3600 ثانية؛ تطبق المدة على الصور في هذه القائمة فقط.
+5. فعّل **Automatisch wiederholen** للتكرار، ثم اضغط **Speichern**.
+6. اضغط **Jetzt wiedergeben** بجوار القائمة المطلوبة للانتقال إليها فورًا، باستخدام عملية MPV نفسها.
+
+الخيار **Beim Start verwenden** يحفظ القائمة التي يستخدمها زر بدء التشغيل لاحقًا، دون قطع
+العرض الجاري. **Alle Medien** يعيد الاختيار الافتراضي: عرض كل الوسائط أبجديًا، ومدة الصور
+10 ثوانٍ، مع التكرار. عند وجود قائمة قيد العرض، استخدم **Jetzt wiedergeben** للتبديل المباشر؛
+زر البدء في Übersicht يستأنف العرض الموجود إن كان مشغّلًا بالفعل.
+
+الفيديوهات تعمل حتى نهايتها. القائمة غير المتكررة تنتهي بخلفية سوداء. القوائم الفارغة يمكن
+حفظها للتحرير لاحقًا، ويُمنع تشغيلها. القوائم المحفوظة لا تُحمَّل مجددًا في MPV عند تحريرها
+إلا بعد بدء عرضها مجددًا، حتى لا تقطع التعديلات العرض الحالي.
+
+يُحفظ الترتيب والمدة والتكرار والاختيار في `backend/runtime/playlists.json` باستخدام ملف مؤقت
+ثم استبدال ذري. تبقى البيانات بعد إعادة تشغيل الخادم والجهاز. هذا لا يفعّل بدء العرض تلقائيًا
+بعد الإقلاع؛ إعداد systemd والتشغيل التلقائي ما زال مرحلة لاحقة.
+تعارض تعديل قائمة من جهازين يعيد رسالة تطلب إعادة تحميلها، بدل استبدال تعديل الجهاز الآخر.
+إذا كان JSON المحفوظ تالفًا يرفض الخادم الكتابة فوقه لتبقى إمكانية استعادته.
+
+## تحديث النسخة الموجودة على الـPi
+
+أوقف خادم Python بـ`Ctrl+C`، ثم حدّث الكود من مجلد المشروع الفعلي:
 
 ```bash
-cat backend/runtime/api-token
+cd /home/admin/werbungen/digital_signage
+git fetch origin
+git switch enhancment
+git pull --ff-only
+backend/.venv/bin/python -m pip install -r backend/requirements.txt
 ```
 
-إذا عيّنت `SIGNAGE_API_TOKEN` يدويًا، استخدم تلك القيمة بدل الملف.
-إذا غيّرت منفذ الواجهة، أضف مصدرها الكامل إلى `SIGNAGE_ALLOWED_ORIGINS` ثم أعد تشغيل الخادم.
-لم يُفتح الخادم لأجهزة الشبكة الأخرى بعد؛ إعداد Nginx سيكون في مرحلة النشر.
+تثبيت الاعتماديات ضروري لهذا التحديث بسبب إضافة **Pillow**. لا تنقل بيئة `.venv` من الـMac؛
+استخدم بيئة الـPi نفسه. لا تحذف `backend/runtime` عند التحديث، لأنه يحتوي كلمة المرور والقوائم.
 
-لبناء نسخة بموارد محلية قابلة للاستضافة لاحقًا دون CDN:
+ابنِ الواجهة على الـMac من جذر المشروع وانقل ملفاتها:
 
 ```bash
+flutter pub get
 flutter build web --release --no-web-resources-cdn
+rsync -av --progress build/web/ admin@192.168.178.157:signage-web/
 ```
 
-عند عدم تحديد `API_BASE_URL`، تقترح الواجهة عنوان استضافتها نفسه للـAPI، ليناسب Nginx لاحقًا.
-لا تضع رمز الوصول في `--dart-define`؛ أدخله في شاشة الاتصال.
-
-للتحقق من الواجهة:
+على الـPi، مع إعداد Nginx الموجود مسبقًا:
 
 ```bash
-flutter analyze
-flutter test
+sudo mkdir -p /var/www/digital-signage
+sudo cp -R /home/admin/signage-web/. /var/www/digital-signage/
+sudo chmod -R a+rX /var/www/digital-signage
 ```
 
-تغطي الاختبارات الدخول، الأوامر السبعة، المفاتيح غير الصحيحة، انقطاع الاتصال والتعافي،
-تعطيل التشغيل عند غياب الفيديوهات، والتخطيط على شاشة بعرض 320 بكسل.
-تغطي اختبارات Medien عرض الملفات، وتأكيد الحذف وإلغاءه، ورفض حذف الملفات المستخدمة،
-وتقدم الرفع وفشله واستمراره عند تبديل الشاشة، وإلغاء النقل عند تسجيل الخروج، وانتهاء الجلسة.
+المسارات والعنوان أعلاه تخص إعداد المشروع الحالي؛ عدّلها إذا اختلف مستخدم الجهاز أو عنوانه.
+`~` يتبع المستخدم الحالي، ولذلك استخدمنا `/home/admin` صراحةً لتفادي النسخ من `/root`.
+لا يحتاج Nginx إلى تعديل لهذا التحديث إذا كان يمرر `/api/` إلى `127.0.0.1:8000` كما أُعد سابقًا.
+أعد تشغيل الخادم من جلسة الشاشة:
 
-### إدارة الفيديوهات من الواجهة
+```bash
+cd /home/admin/werbungen/digital_signage
+backend/.venv/bin/python backend/run.py
+```
 
-بعد تسجيل الدخول اختر **Medien** من شريط التنقل:
+افتح `http://192.168.178.157:8080` وأعد تحميل المتصفح بالكامل. اختبر الصور ومدة عرضها والقوائم
+المختلطة وتبديل القوائم على الشاشة الفعلية قبل اعتماد التحديث.
+الاختبارات المحلية تستخدم MPV فعليًا بمخرج فيديو `null`؛ لا تثبت الأداء البصري على الـPi.
 
-1. اضغط **Video hochladen** واختر MP4 أو MKV أو MOV أو WebM.
-2. يظهر شريط تقدم النقل، ثم **Video wird geprüft …** حتى يقبل الخادم الملف.
-3. يظهر الفيديو في القائمة مع حجمه؛ الأسماء الموجودة تُرفض دون استبدال ملفاتها.
-4. للحذف اضغط أيقونة سلة المهملات بجوار الفيديو، ثم **Löschen** للتأكيد أو **Abbrechen** للإلغاء.
+## الإعدادات والتخزين
 
-رفع ملف واحد في كل مرة يبقي التعامل واضحًا. يستمر الرفع عند الانتقال إلى Übersicht،
-ويُلغى عند تسجيل الخروج أو إغلاق الصفحة. إذا كان الملف ضمن قائمة التشغيل المحملة،
-أوقف العرض من Übersicht قبل حذفه. الرفع لا يغيّر الفيديو الجاري عرضه.
-زر **Dateien aktualisieren** يجلب التغييرات التي أُجريت من جهاز آخر.
-حزمة `web` تتيح اختيار الملف وقياس تقدم النقل مباشرةً في المتصفح، دون تحميل الفيديو كاملًا إلى ذاكرة Dart.
+| المتغير | الافتراضي | الغرض |
+|---|---|---|
+| `SIGNAGE_API_TOKEN` | ملف محلي يُنشأ تلقائيًا | كلمة مرور مخصصة اختيارية |
+| `SIGNAGE_VIDEOS_DIR` | `python_project/videos` | مجلد الصور والفيديوهات |
+| `SIGNAGE_RUNTIME_DIR` | `backend/runtime` | كلمة المرور والقفل ومقبس IPC والمعاينات |
+| `SIGNAGE_PLAYLISTS_FILE` | `backend/runtime/playlists.json` | ملف القوائم الدائم |
+| `SIGNAGE_MPV_BINARY` | `mpv` | ملف المشغل التنفيذي |
+| `SIGNAGE_FFPROBE_BINARY` | `ffprobe` | فحص الفيديوهات |
+| `SIGNAGE_MAX_UPLOAD_MB` | `512` | الحد الأقصى لكل ملف بالـMiB |
+| `SIGNAGE_ALLOWED_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | مصادر واجهة التطوير المسموح بها، مفصولة بفاصلة |
 
-## إدارة الفيديوهات
+إذا غيرت منفذ Flutter، حدّث `SIGNAGE_ALLOWED_ORIGINS` وأعد تشغيل الخادم. عند استضافة الواجهة
+والـAPI على عنوان واحد عبر Nginx لا تحتاج إضافة مصدر جديد.
+احتفظ بنسخة احتياطية من مجلد الوسائط وملف القوائم وكلمة المرور. معاينات `runtime/previews`
+قابلة لإعادة الإنشاء. يفضّل مسار قصير لـ`SIGNAGE_RUNTIME_DIR` بسبب حدود Unix sockets.
 
-تستخدم المجلد نفسه دون قاعدة بيانات؛ اسم الملف هو معرّفه. جميع الطلبات تحتاج رمز الوصول.
+## REST API
+
+جميع الطلبات عدا `/api/health` تحتاج `Authorization: Bearer <password>`.
 
 | الطريقة | المسار | الوظيفة |
 |---|---|---|
-| GET | `/api/media` | قائمة الفيديوهات مع الاسم والحجم بالبايت |
-| GET | `/api/media/{id}` | معلومات فيديو محدد |
-| POST | `/api/media/upload?filename=clip.mp4` | رفع فيديو |
-| DELETE | `/api/media/{id}?confirm=true` | حذف بعد التأكيد |
+| GET | `/api/health` | صحة الخادم |
+| GET | `/api/player/status` | الحالة، الملف والقائمة الحاليان، وعدد الصور والفيديوهات |
+| POST | `/api/player/start`, `/pause`, `/resume`, `/stop`, `/next`, `/previous`, `/restart` | أوامر المشغل، وكل مسار تحت `/api/player` |
+| GET | `/api/media` | مكتبة الوسائط مع `type: image/video` |
+| POST | `/api/media/upload?filename=Bild.png` | بايتات الملف مباشرة، دون multipart |
+| GET | `/api/media/{id}` | معلومات الملف |
+| GET | `/api/media/{id}/preview` | معاينة صورة PNG مصغرة ومحمية بالمصادقة |
+| DELETE | `/api/media/{id}?confirm=true` | حذف ملف غير مستخدم |
+| GET | `/api/playlists` | القوائم والاختيار المحفوظ |
+| POST | `/api/playlists` | إنشاء قائمة |
+| PUT | `/api/playlists/{id}` | تحديث القائمة مع `revision` الحالي |
+| PUT | `/api/playlists/selected` | اختيار افتراضي: `{"id":"..."}` أو `{"id":null}` لكل الوسائط |
+| POST | `/api/playlists/{id}/start` | اختيار القائمة وبدء عرضها فورًا |
+| DELETE | `/api/playlists/{id}?confirm=true` | حذف قائمة دون ملفاتها، بعد إيقاف عرضها إن كانت نشطة |
 
-الرفع يرسل بايتات الملف مباشرة في جسم الطلب، **دون multipart**، واسم الملف في query parameter.
-هذا يسمح بالكتابة التدريجية وحد الحجم دون مكتبة إضافية؛ يمكن للواجهة رفع عدة ملفات بطلب مستقل لكل ملف.
-أمثلة من Terminal ثانية بعد بدء الخادم:
+جسم إنشاء أو تحديث القائمة:
 
-```bash
-export SIGNAGE_API_TOKEN="$(cat backend/runtime/api-token)"
-curl -H "Authorization: Bearer $SIGNAGE_API_TOKEN" http://127.0.0.1:8000/api/media
-curl -X POST -H "Authorization: Bearer $SIGNAGE_API_TOKEN" \
-  -H "Content-Type: application/octet-stream" \
-  --data-binary "@/path/to/clip.mp4" \
-  "http://127.0.0.1:8000/api/media/upload?filename=clip.mp4"
+```json
+{"name":"Schaufenster","items":["Bild.png","Werbung.mp4"],"image_duration":10,"loop":true,"revision":0}
 ```
 
-استبدل مسار المثال بمسار الفيديو لديك. استجابة الرفع الناجح `201` ومعلومات الملف.
-يُرفض الاسم الموجود بـ`409` دون استبداله، والمسارات غير الآمنة بـ`400`، والامتداد غير المدعوم بـ`415`،
-والملف الفارغ أو المزيف أو الصوتي فقط بـ`422`، وتجاوز الحجم بـ`413`، وغياب FFprobe بـ`503`، وامتلاء القرص بـ`507`.
-الحد مطبق أثناء استقبال البيانات أيضًا، حتى عند غياب `Content-Length`.
-يفحص FFprobe الحاوية ووجود مسار فيديو؛ لا يجري تحويلًا أو فك ترميز كامل لكل إطار.
-يُكتب الملف مؤقتًا ولا يراه المشغل إلا بعد اكتمال الرفع ونجاح الفحص. الرفع المنقطع ينظَّف تلقائيًا.
-
-للحذف، أوقف العرض إذا كان الفيديو ضمن القائمة المحملة، ثم أكّد الحذف:
-
-```bash
-curl -X POST -H "Authorization: Bearer $SIGNAGE_API_TOKEN" http://127.0.0.1:8000/api/player/stop
-curl -X DELETE -H "Authorization: Bearer $SIGNAGE_API_TOKEN" \
-  "http://127.0.0.1:8000/api/media/clip.mp4?confirm=true"
-```
-
-الحذف الناجح يعيد `204` دون محتوى. حماية القائمة تشمل الفيديو الحالي والمتوقف مؤقتًا والملفات المنتظرة؛
-طلب دون `confirm=true` يعيد `400`. ستعرض واجهة Flutter نافذة التأكيد لاحقًا.
-الفيديوهات الجديدة تدخل العرض عند بدء قائمة جديدة أو إعادة تشغيل المشغل؛ الرفع لا يقطع العرض الجاري.
+`revision` الابتدائي 0 عند الإنشاء؛ أرسل الرقم الذي أعاده الخادم عند التحديث.
+الأخطاء ألمانية: `400` لاسم غير آمن أو غياب تأكيد الحذف، `401` للمصادقة، `404` لملف أو قائمة
+مفقودة، `409` لتعارض أو ملف مستخدم أو قائمة فارغة، `413` لتجاوز حجم الرفع، `415` لصيغة غير
+مدعومة، `422` لبيانات أو صورة أو فيديو غير صالح، `503` لتعذر الوصول إلى المشغل أو أداة الفحص،
+و`507` لامتلاء التخزين.
 
 ## الاختبارات
 
 ```bash
-sudo apt install ffmpeg
 backend/.venv/bin/python -m pip install -r backend/requirements-dev.txt
 backend/.venv/bin/python -m unittest discover -s backend/tests -v
+flutter analyze
+flutter test
 ```
 
-اختبارات التكامل تتطلب `mpv` و`ffmpeg`؛ بدونهما تظهر كتجاوزات. تُنشئ فيديوهات مؤقتة وتستخدم MPV دون نافذة أو صوت، ثم تنظف العمليات والملفات.
-تشمل المصادقة والتشغيل والتنقل والإيقاف والاستئناف وإعادة التشغيل والتعافي بعد التعطل وطلبات التشغيل المتزامنة.
-تشمل إدارة الفيديوهات الصيغ الأربع، الملفات المزيفة والصوتية، حدود الحجم والرفع المنقطع،
-والأسماء غير الآمنة والروابط الرمزية، ومنع الحذف أثناء التشغيل ومنع الاستبدال عند الرفع المتزامن.
+اختبارات التكامل تتطلب MPV وFFmpeg، وإلا تظهر كتجاوزات. تستخدم ملفات مؤقتة وتنهي العمليات
+بعد الفحص. تشمل اختبارات الخادم الصيغ المدعومة، الصور المزيفة والمتضررة والكبيرة والمتحركة،
+حدود الرفع، الحفظ الذري وحماية المراجع والتعارضات، والتشغيل المختلط والتكرار وتبديل القوائم.
+اختبارات Flutter تشمل الرفع وتقدم النقل والحذف، مكتبة صور فقط، وإنشاء القوائم وترتيبها
+واختيارها وتشغيلها، والشاشة الضيقة وتكبير النصوص وتغيير حجم النافذة أثناء الرفع.
 
-نجحت الاختبارات محليًا على macOS. لم يُختبر الخادم الجديد على Raspberry Pi بعد؛ قبل اعتماد المرحلة على الجهاز:
+## مراجع
 
-1. جرّب جميع أوامر الجدول وتأكد من ملء الشاشة وغياب الصوت.
-2. تحقق بصريًا من بقاء شاشة سوداء عند `stop`.
-3. تحقق من تكرار الفيديوهات واستمرارها بعد إغلاق المتصفح.
-4. إذا لم تظهر النافذة شغّل الخادم من جلسة الشاشة نفسها وافحص `DISPLAY` أو `WAYLAND_DISPLAY` وصلاحيات المستخدم، دون تشغيله باستخدام root.
-
-مراجع: [MPV وخيارات JSON IPC](https://mpv.io/manual/stable/)، [FastAPI lifespan](https://fastapi.tiangolo.com/advanced/events/)، [اختبار دورة حياة الخادم](https://fastapi.tiangolo.com/advanced/testing-events/).
-الرفع التدريجي موضح في [Starlette Requests](https://starlette.dev/requests/)، وفحص المسارات في [FFprobe](https://ffmpeg.org/ffprobe.html).
-إعداد اتصال المتصفح في [FastAPI CORS](https://fastapi.tiangolo.com/tutorial/cors/)، وإدارة الموارد في [Riverpod Refs](https://riverpod.dev/docs/concepts2/refs).
-قياس تقدم النقل موضح في [XMLHttpRequest upload](https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/upload).
+- [MPV JSON IPC وخيارات مدة الصور والتكرار](https://mpv.io/manual/stable/)
+- [Pillow Image وفحص الصور](https://pillow.readthedocs.io/en/stable/reference/Image.html)
+- [FastAPI CORS](https://fastapi.tiangolo.com/tutorial/cors/)
+- [Starlette streaming requests](https://starlette.dev/requests/)
+- [XMLHttpRequest upload progress](https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/upload)

@@ -6,6 +6,7 @@ import '../../core/widgets/shop_logo.dart';
 import '../../models/player_status.dart';
 import '../../providers/dashboard_provider.dart';
 import '../media/media_page.dart';
+import '../playlists/playlists_page.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -70,6 +71,7 @@ class _SignedInDashboardState extends ConsumerState<_SignedInDashboard> {
               children: [
                 _Overview(state: widget.state),
                 const MediaPage(),
+                PlaylistsPage(active: _index == 2),
               ],
             ),
           ),
@@ -89,6 +91,14 @@ class _SignedInDashboardState extends ConsumerState<_SignedInDashboard> {
                       icon: Icon(Icons.video_library_outlined),
                       selectedIcon: Icon(Icons.video_library_rounded),
                       label: 'Medien',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(
+                        Icons.playlist_play_outlined,
+                        key: Key('playlists-tab'),
+                      ),
+                      selectedIcon: Icon(Icons.playlist_play),
+                      label: 'Listen',
                     ),
                   ],
                 ),
@@ -166,6 +176,16 @@ class _DesktopNavigation extends StatelessWidget {
                   NavigationRailDestination(
                     icon: Icon(Icons.video_library_outlined),
                     label: Text('Medien'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(
+                      Icons.playlist_play_outlined,
+                      key: Key('playlists-tab'),
+                    ),
+                    label: SizedBox(
+                      width: 132,
+                      child: Text('Wiedergabelisten', maxLines: 2),
+                    ),
                   ),
                 ],
               ),
@@ -503,8 +523,8 @@ class _Overview extends ConsumerWidget {
                     SizedBox(
                       width: width,
                       child: _InfoCard(
-                        title: 'Verfügbare Videos',
-                        value: status?.videoCount.toString() ?? '–',
+                        title: 'Verfügbare Medien',
+                        value: status?.mediaCount.toString() ?? '–',
                         icon: Icons.video_library_outlined,
                       ),
                     ),
@@ -526,9 +546,9 @@ class _Overview extends ConsumerWidget {
                       style: theme.textTheme.titleLarge,
                     ),
                     const SizedBox(height: 8),
-                    if (status?.videoCount == 0)
+                    if (status?.mediaCount == 0)
                       const Text(
-                        'Noch keine Videos vorhanden. Fügen Sie zuerst Videos hinzu.',
+                        'Noch keine Medien vorhanden. Fügen Sie zuerst Bilder oder Videos hinzu.',
                       ),
                     const SizedBox(height: 16),
                     LayoutBuilder(
@@ -580,7 +600,7 @@ class _Overview extends ConsumerWidget {
                               Icons.play_arrow,
                               PlayerCommand.start,
                               ready &&
-                                  status.videoCount > 0 &&
+                                  status.mediaCount > 0 &&
                                   !status.isActive,
                               primary: true,
                             ),
@@ -618,7 +638,7 @@ class _Overview extends ConsumerWidget {
                               'Neu starten',
                               Icons.restart_alt,
                               PlayerCommand.restart,
-                              ready && status.videoCount > 0,
+                              ready && status.mediaCount > 0,
                             ),
                           ],
                         );
@@ -729,6 +749,16 @@ class _NowPlaying extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
+                  if (status?.currentPlaylistName != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Wiedergabeliste: ${status!.currentPlaylistName}',
+                      style: const TextStyle(
+                        color: Color(0xFFBCCAE6),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Text(
                     !state.connected

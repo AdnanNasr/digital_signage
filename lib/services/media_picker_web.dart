@@ -7,20 +7,20 @@ import 'package:web/web.dart' as web;
 import '../models/media_file.dart';
 import 'signage_api.dart';
 
-Future<VideoUpload?> pickVideo() {
-  final result = Completer<VideoUpload?>();
+Future<MediaUpload?> pickMedia() {
+  final result = Completer<MediaUpload?>();
   final input = web.HTMLInputElement()
     ..type = 'file'
-    ..accept = '.mp4,.mkv,.mov,.webm'
+    ..accept = '.jpg,.jpeg,.png,.webp,.mp4,.mkv,.mov,.webm'
     ..style.display = 'none';
-  void finish(VideoUpload? value) {
+  void finish(MediaUpload? value) {
     if (!result.isCompleted) result.complete(value);
     input.remove();
   }
 
   input.onchange = ((web.Event event) {
     final file = input.files?.item(0);
-    finish(file == null ? null : _BrowserVideo(file));
+    finish(file == null ? null : _BrowserMedia(file));
   }).toJS;
   input.addEventListener('cancel', ((web.Event event) => finish(null)).toJS);
   web.document.body!.appendChild(input);
@@ -28,8 +28,8 @@ Future<VideoUpload?> pickVideo() {
   return result.future;
 }
 
-class _BrowserVideo implements VideoUpload {
-  _BrowserVideo(this.file);
+class _BrowserMedia implements MediaUpload {
+  _BrowserMedia(this.file);
   final web.File file;
   web.XMLHttpRequest? _request;
 
@@ -65,7 +65,7 @@ class _BrowserVideo implements VideoUpload {
       } else if (request.status == 401) {
         fail('Das Passwort ist ungültig. Bitte erneut anmelden.', 401);
       } else {
-        var message = 'Das Video konnte nicht hochgeladen werden.';
+        var message = 'Die Datei konnte nicht hochgeladen werden.';
         try {
           final data = jsonDecode(request.responseText);
           if (data is Map<String, dynamic> && data['detail'] is String) {

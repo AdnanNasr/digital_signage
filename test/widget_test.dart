@@ -13,6 +13,7 @@ class FakeServer {
   bool offline = false;
   bool unauthorized = false;
   int videos = 2;
+  int images = 0;
   final commands = <String>[];
 
   Future<http.Response> handle(http.Request request) async {
@@ -34,6 +35,7 @@ class FakeServer {
         'state': state,
         'reachable': state != 'stopped',
         'video_count': videos,
+        'image_count': images,
         'current_file': state == 'stopped'
             ? null
             : 'Werbung für unser Geschäft.mp4',
@@ -90,6 +92,17 @@ Future<void> closeApp(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('image-only library can start playback', (tester) async {
+    final server = FakeServer()
+      ..videos = 0
+      ..images = 2;
+    await openApp(tester, server);
+    await login(tester);
+    await tapControl(tester, 'Wiedergabe starten');
+    expect(server.commands, ['start']);
+    await closeApp(tester);
+  });
+
   testWidgets('enlarged text remains usable without layout overflow', (
     tester,
   ) async {

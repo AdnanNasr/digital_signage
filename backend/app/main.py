@@ -6,13 +6,16 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .config import Settings, get_allowed_origins
 from .routes.player import router
 from .routes.media import router as media_router
+from .routes.playlists import router as playlists_router
 from .services.media import MediaService
 from .services.player import PlayerError, PlayerService
+from .services.playlists import PlaylistService
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -24,8 +27,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         player = PlayerService(app.state.settings)
         player.open()
         app.state.player = player
-        app.state.media = MediaService(app.state.settings, player)
         try:
+            media = MediaService(app.state.settings, player)
+            app.state.media = media
+            playlists = PlaylistService(app.state.settings, media)
+            app.state.playlists = playlists
+            player.playlist_source = playlists.selected_plan
+            media.deletion_check = playlists.ensure_media_unused
             yield
         finally:
             player.close()
@@ -34,7 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # CORS settings do not require loading or creating the API token at import time.
     origins = settings.allowed_origins if settings else get_allowed_origins()
     app.add_middleware(CORSMiddleware, allow_origins=list(origins),
-                       allow_methods=["GET", "POST", "DELETE"],
+                       allow_methods=["GET", "POST", "PUT", "DELETE"],
                        allow_headers=["Authorization", "Content-Type"])
 
     def authorize(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
@@ -46,6 +54,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(PlayerError)
     async def player_error(request: Request, error: PlayerError):
         return JSONResponse(status_code=error.status_code, content={"detail": str(error)})
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_input(request: Request, error: RequestValidationError):
+        return JSONResponse(status_code=422, content={"detail": "Ungültige Angaben. Bitte Name, Dateien und Bilddauer prüfen."})
 
     @app.get("/api/health", tags=["System"])
     def health():
@@ -62,6 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(router, dependencies=[Depends(authorize)])
     app.include_router(media_router, dependencies=[Depends(authorize)])
+    app.include_router(playlists_router, dependencies=[Depends(authorize)])
     return app
 
 

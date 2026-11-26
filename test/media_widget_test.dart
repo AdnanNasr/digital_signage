@@ -23,6 +23,7 @@ class MediaServer extends FakeServer {
   @override
   Future<http.Response> handle(http.Request request) async {
     if (request.url.path.startsWith('/api/media')) {
+      if (request.url.path.endsWith('/preview')) return http.Response('', 404);
       if (unauthorized) return http.Response('{}', 401);
       if (request.method == 'DELETE') {
         if (protect) {
@@ -45,7 +46,7 @@ class MediaServer extends FakeServer {
                 (name) => {
                   'id': name,
                   'name': name,
-                  'type': 'video',
+                  'type': name.endsWith('.png') ? 'image' : 'video',
                   'size_bytes': 1024 * 1024,
                 },
               )
@@ -59,7 +60,7 @@ class MediaServer extends FakeServer {
   }
 }
 
-class FakeUpload implements VideoUpload {
+class FakeUpload implements MediaUpload {
   FakeUpload(this.server);
   final MediaServer server;
   final completion = Completer<void>();
@@ -108,7 +109,7 @@ Future<void> openMedia(
     ProviderScope(
       overrides: [
         httpClientProvider.overrideWithValue(MockClient(server.handle)),
-        videoPickerProvider.overrideWithValue(() async => upload),
+        mediaPickerProvider.overrideWithValue(() async => upload),
       ],
       child: const SignageApp(),
     ),
@@ -119,6 +120,23 @@ Future<void> openMedia(
 }
 
 void main() {
+  testWidgets('uploads an image and displays it in the media library', (
+    tester,
+  ) async {
+    final server = MediaServer();
+    final upload = FakeUpload(server)..name = 'Angebot.png';
+    await openMedia(tester, server, upload: upload);
+    await tester.tap(find.text('Datei hochladen'));
+    await tester.pump();
+    await tester.pump();
+    upload.completion.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Angebot.png'), findsOneWidget);
+    expect(find.text('Datei erfolgreich hochgeladen.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await closeApp(tester);
+  });
+
   testWidgets('expired session returns to login from media requests', (
     tester,
   ) async {
@@ -149,8 +167,8 @@ void main() {
     await tester.tap(find.text('Löschen'));
     await tester.pumpAndSettle();
     expect(server.deleted, ['Grüße & Angebote.mp4']);
-    expect(find.text('Video erfolgreich gelöscht.'), findsOneWidget);
-    expect(find.textContaining('Noch keine Videos'), findsOneWidget);
+    expect(find.text('Datei erfolgreich gelöscht.'), findsOneWidget);
+    expect(find.textContaining('Noch keine Medien'), findsOneWidget);
     await closeApp(tester);
   });
 
@@ -174,7 +192,7 @@ void main() {
       final server = MediaServer();
       final upload = FakeUpload(server);
       await openMedia(tester, server, upload: upload);
-      await tester.tap(find.text('Video hochladen'));
+      await tester.tap(find.text('Datei hochladen'));
       await tester.pump();
       await tester.pump();
       expect(find.text('Wird hochgeladen … 50 %'), findsOneWidget);
@@ -186,7 +204,7 @@ void main() {
       expect(find.text('Wird hochgeladen … 50 %'), findsOneWidget);
       upload.progress!(1);
       await tester.pump();
-      expect(find.text('Video wird geprüft …'), findsOneWidget);
+      expect(find.text('Datei wird geprüft …'), findsOneWidget);
       await tester.tap(find.text('Übersicht'));
       await tester.pump();
       expect(upload.cancelled, isFalse);
@@ -195,7 +213,7 @@ void main() {
       await tester.tap(find.text('Medien'));
       await tester.pumpAndSettle();
       expect(find.text('Neues Video.mp4'), findsOneWidget);
-      expect(find.text('Video erfolgreich hochgeladen.'), findsOneWidget);
+      expect(find.text('Datei erfolgreich hochgeladen.'), findsOneWidget);
       await closeApp(tester);
     },
   );
@@ -204,7 +222,7 @@ void main() {
     final server = MediaServer();
     final upload = FakeUpload(server);
     await openMedia(tester, server, upload: upload);
-    await tester.tap(find.text('Video hochladen'));
+    await tester.tap(find.text('Datei hochladen'));
     await tester.pump();
     await tester.pump();
     upload.completion.completeError(
@@ -218,7 +236,7 @@ void main() {
     expect(
       tester
           .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Video hochladen'),
+            find.widgetWithText(FilledButton, 'Datei hochladen'),
           )
           .onPressed,
       isNotNull,
@@ -231,7 +249,7 @@ void main() {
     final server = MediaServer();
     final upload = FakeUpload(server);
     await openMedia(tester, server, upload: upload);
-    await tester.tap(find.text('Video hochladen'));
+    await tester.tap(find.text('Datei hochladen'));
     await tester.pump();
     await tester.pump();
     await tester.tap(find.byTooltip('Abmelden'));
@@ -258,7 +276,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byTooltip('Grüße & Angebote.mp4 löschen'));
       await tester.pumpAndSettle();
-      expect(find.text('Video löschen?'), findsOneWidget);
+      expect(find.text('Datei löschen?'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.tap(find.text('Abbrechen'));
       await tester.pumpAndSettle();

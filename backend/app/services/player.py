@@ -6,13 +6,25 @@ import subprocess
 import threading
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from python_project.main import get_videos
 
 from ..config import Settings
+from ..media_types import MEDIA_EXTS, IMAGE_FORMATS
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PlaybackPlan:
+    id: str | None
+    name: str
+    files: list[Path]
+    image_duration: int = 10
+    loop: bool = True
 
 
 class PlayerError(Exception):
@@ -30,6 +42,12 @@ class PlayerService:
         self._lock = threading.RLock()
         self._process: subprocess.Popen | None = None
         self._ownership = None
+        self.playlist_source: Callable[[], PlaybackPlan | None] | None = None
+        self._current_plan: PlaybackPlan | None = None
+
+    @property
+    def lock(self):
+        return self._lock
 
     def open(self) -> None:
         self.settings.runtime_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -94,16 +112,54 @@ class PlayerService:
     def _videos(self) -> list[Path]:
         root = self.settings.videos_dir.resolve()
         return [path.resolve() for path in get_videos(root)
-                if path.resolve().is_relative_to(root)]
+                if not path.is_symlink() and not path.name.startswith(".")
+                and path.resolve().is_relative_to(root)]
 
-    def _load_videos(self) -> None:
-        videos = self._videos()
-        if not videos:
-            raise PlayerError("Keine Videos vorhanden.", 409)
+    def _media_files(self) -> list[Path]:
+        root = self.settings.videos_dir.resolve()
+        if not root.is_dir():
+            return []
+        return sorted(path for path in root.iterdir() if path.is_file() and not path.is_symlink()
+                      and not path.name.startswith(".") and path.suffix.lower() in MEDIA_EXTS)
+
+    def _configured_plan(self) -> PlaybackPlan:
+        selected = self.playlist_source() if self.playlist_source else None
+        return selected or PlaybackPlan(None, "Alle Medien", self._media_files())
+
+    def _load_plan(self, plan: PlaybackPlan) -> None:
+        if not plan.files:
+            raise PlayerError("Keine Medien vorhanden.", 409)
+        root = self.settings.videos_dir.resolve()
+        if any(not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(root)
+               for path in plan.files):
+            raise PlayerError("Eine Datei der Wiedergabeliste ist nicht verfügbar.", 409)
         self._ensure_running()
-        for index, video in enumerate(videos):
-            self._command("loadfile", str(video), "replace" if index == 0 else "append")
-        self._command("set_property", "pause", False)
+        try:
+            self._command("set_property", "pause", True)
+            self._command("set_property", "loop-playlist", "inf" if plan.loop else "no")
+            self._command("set_property", "image-display-duration", plan.image_duration)
+            for index, path in enumerate(plan.files):
+                self._command("loadfile", str(path.resolve()), "replace" if index == 0 else "append")
+            self._current_plan = plan
+            self._command("set_property", "pause", False)
+        except PlayerError:
+            self._current_plan = None
+            try:
+                self._command("stop")
+            except PlayerError:
+                pass
+            raise
+
+    def play(self, plan: PlaybackPlan) -> dict:
+        with self._lock:
+            self._load_plan(plan)
+            return self.status()
+
+    def is_playing_playlist(self, playlist_id: str) -> bool:
+        with self._lock:
+            return bool(self._current_plan and self._current_plan.id == playlist_id
+                        and self._process is not None and self._process.poll() is None
+                        and not self._command("get_property", "idle-active"))
 
     def start(self) -> dict:
         with self._lock:
@@ -111,7 +167,7 @@ class PlayerService:
                 if not self._command("get_property", "idle-active"):
                     self._command("set_property", "pause", False)
                     return self.status()
-            self._load_videos()
+            self._load_plan(self._configured_plan())
             return self.status()
 
     def pause(self) -> dict:
@@ -139,14 +195,16 @@ class PlayerService:
         with self._lock:
             self._ensure_running()
             self._command("stop")
+            self._current_plan = None
             return self.status()
 
     def restart(self) -> dict:
         with self._lock:
-            if not self._videos():
-                raise PlayerError("Keine Videos vorhanden.", 409)
+            plan = self._configured_plan()
+            if not plan.files:
+                raise PlayerError("Keine Medien vorhanden.", 409)
             self._terminate()
-            self._load_videos()
+            self._load_plan(plan)
             return self.status()
 
     def status(self) -> dict:
@@ -169,8 +227,12 @@ class PlayerService:
                 return self._status("error", "Fehler", False)
 
     def _status(self, state, label, reachable, filename=None) -> dict:
+        current = self._current_plan if state in {"playing", "paused"} else None
         return {"state": state, "label": label, "reachable": reachable,
-                "current_file": filename, "video_count": len(self._videos())}
+                "current_file": filename, "video_count": len(self._videos()),
+                "image_count": sum(path.suffix.lower() in IMAGE_FORMATS for path in self._media_files()),
+                "current_playlist_id": current.id if current else None,
+                "current_playlist_name": current.name if current else None}
 
     @contextmanager
     def guard_media_deletion(self, path: Path):

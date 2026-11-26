@@ -4,10 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/media_file.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../services/signage_api.dart';
-import '../../services/video_picker.dart';
+import '../../services/media_picker.dart';
+import 'media_thumbnail.dart';
 
-final videoPickerProvider = Provider<Future<VideoUpload?> Function()>(
-  (ref) => pickVideo,
+final mediaPickerProvider = Provider<Future<MediaUpload?> Function()>(
+  (ref) => pickMedia,
 );
 
 class MediaPage extends ConsumerStatefulWidget {
@@ -23,7 +24,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
   bool _working = false;
   String? _error;
   String? _message;
-  VideoUpload? _upload;
+  MediaUpload? _upload;
   double? _progress;
 
   SignageApi? get _api => ref.read(dashboardProvider.notifier).api;
@@ -71,7 +72,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
     if (_working) return;
     final api = _api;
     if (api == null) return;
-    final choose = ref.read(videoPickerProvider);
+    final choose = ref.read(mediaPickerProvider);
     setState(() {
       _working = true;
       _error = null;
@@ -85,10 +86,12 @@ class _MediaPageState extends ConsumerState<MediaPage> {
         return;
       }
       if (!RegExp(
-        r'\.(mp4|mkv|mov|webm)$',
+        r'\.(jpg|jpeg|png|webp|mp4|mkv|mov|webm)$',
         caseSensitive: false,
       ).hasMatch(file.name)) {
-        throw const ApiException('Erlaubt sind MP4, MKV, MOV und WebM.');
+        throw const ApiException(
+          'Erlaubt sind JPG, PNG, WebP, MP4, MKV, MOV und WebM.',
+        );
       }
       if (file.size == 0) throw const ApiException('Die Datei ist leer.');
       setState(() {
@@ -100,10 +103,21 @@ class _MediaPageState extends ConsumerState<MediaPage> {
       });
       if (!mounted) return;
       setState(() {
-        _message = 'Video erfolgreich hochgeladen.';
+        _message = 'Datei erfolgreich hochgeladen.';
         _files = [
           ..._files,
-          MediaFile(id: file.name, name: file.name, sizeBytes: file.size),
+          MediaFile(
+            id: file.name,
+            name: file.name,
+            sizeBytes: file.size,
+            type:
+                RegExp(
+                  r'\.(jpe?g|png|webp)$',
+                  caseSensitive: false,
+                ).hasMatch(file.name)
+                ? 'image'
+                : 'video',
+          ),
         ]..sort((first, second) => first.name.compareTo(second.name));
       });
       await _load();
@@ -128,7 +142,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Video löschen?'),
+          title: const Text('Datei löschen?'),
           content: Text('„${file.name}“ wird dauerhaft vom Gerät gelöscht.'),
           actions: [
             TextButton(
@@ -153,7 +167,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
       if (!mounted) return;
       setState(() {
         _files = _files.where((item) => item.id != file.id).toList();
-        _message = 'Video erfolgreich gelöscht.';
+        _message = 'Datei erfolgreich gelöscht.';
       });
       ref.read(dashboardProvider.notifier).refresh();
     } on ApiException catch (error) {
@@ -188,7 +202,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Ihre Videos',
+                      'Ihre Medien',
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 8),
@@ -224,14 +238,14 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Neue Videos hinzufügen',
+                                        'Bilder und Videos hinzufügen',
                                         style: Theme.of(context)
                                             .textTheme
                                             .titleLarge,
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
-                                        'MP4, MKV, MOV und WebM',
+                                        'JPG, PNG, WebP · MP4, MKV, MOV, WebM',
                                         style: TextStyle(
                                           color: colors.onSurfaceVariant,
                                         ),
@@ -251,7 +265,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                                       ? null
                                       : _chooseAndUpload,
                                   icon: const Icon(Icons.upload_file),
-                                  label: const Text('Video hochladen'),
+                                  label: const Text('Datei hochladen'),
                                 ),
                                 OutlinedButton.icon(
                                   onPressed: _working || _loading
@@ -288,7 +302,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                               Text(
                                 _progress! < 1
                                     ? 'Wird hochgeladen … ${(_progress! * 100).round()} %'
-                                    : 'Video wird geprüft …',
+                                    : 'Datei wird geprüft …',
                               ),
                             ],
                           ),
@@ -322,7 +336,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                     const SizedBox(height: 20),
                     if (_loading)
                       const LinearProgressIndicator(
-                        semanticsLabel: 'Videos werden geladen',
+                        semanticsLabel: 'Medien werden geladen',
                       ),
                     if (!_loading && _files.isEmpty && _error == null)
                       Card(
@@ -337,7 +351,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                               ),
                               const SizedBox(height: 16),
                               const Text(
-                                'Noch keine Videos vorhanden. Laden Sie Ihr erstes Video hoch.',
+                                'Noch keine Medien vorhanden. Laden Sie Ihr erstes Bild oder Video hoch.',
                                 textAlign: TextAlign.center,
                               ),
                             ],
@@ -347,13 +361,13 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                     if (_files.isNotEmpty) ...[
                       Text(
                         _files.length == 1
-                            ? '1 Video'
-                            : '${_files.length} Videos',
+                            ? '1 Datei'
+                            : '${_files.length} Dateien',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Videos aus der laufenden Wiedergabe können erst nach dem Stoppen gelöscht werden.',
+                        'Dateien in Wiedergabelisten müssen vor dem Löschen aus den Listen entfernt werden.',
                       ),
                     ],
                   ],
@@ -373,18 +387,10 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                         padding: const EdgeInsets.all(12),
                         child: Row(
                           children: [
-                            Container(
-                              width: 48,
-                              height: 56,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEDF1FC),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.movie_outlined,
-                                color: colors.primary,
-                              ),
+                            MediaThumbnail(
+                              key: ValueKey(file.id),
+                              file: file,
+                              api: _api,
                             ),
                             const SizedBox(width: 16),
                             Expanded(

@@ -28,6 +28,12 @@ def get_media(media_id: str, request: Request):
     return request.app.state.media.get(media_id)
 
 
+@router.get("/{media_id}/preview")
+def preview(media_id: str, request: Request):
+    return Response(content=request.app.state.media.preview(media_id), media_type="image/png",
+                        headers={"Cache-Control": "private, max-age=60"})
+
+
 @router.delete("/{media_id}", status_code=204)
 def delete_media(media_id: str, request: Request, confirm: bool = False):
     if not confirm:
