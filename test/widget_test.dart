@@ -18,6 +18,7 @@ class FakeServer {
   Future<http.Response> handle(http.Request request) async {
     if (offline) throw http.ClientException('offline');
     if (unauthorized) return http.Response('{}', 401);
+    if (request.url.path == '/api/media') return http.Response('[]', 200);
     if (request.method == 'POST') {
       final command = request.url.path.split('/').last;
       commands.add(command);

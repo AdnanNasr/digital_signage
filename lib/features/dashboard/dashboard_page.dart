@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/player_status.dart';
 import '../../providers/dashboard_provider.dart';
+import '../media/media_page.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -11,30 +12,68 @@ class DashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(dashboardProvider);
+    if (state.hasSession) return _SignedInDashboard(state: state);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Digital Signage')),
+      body: const SafeArea(child: _ConnectionForm()),
+    );
+  }
+}
+
+class _SignedInDashboard extends ConsumerStatefulWidget {
+  const _SignedInDashboard({required this.state});
+  final DashboardState state;
+
+  @override
+  ConsumerState<_SignedInDashboard> createState() => _SignedInDashboardState();
+}
+
+class _SignedInDashboardState extends ConsumerState<_SignedInDashboard> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final controller = ref.read(dashboardProvider.notifier);
     return Scaffold(
       appBar: AppBar(
-        title: Text(state.hasSession ? 'Übersicht' : 'Digital Signage'),
-        actions: state.hasSession
-            ? [
-                IconButton(
-                  tooltip: 'Aktualisieren',
-                  onPressed: state.busy ? null : controller.refresh,
-                  icon: const Icon(Icons.refresh),
-                ),
-                IconButton(
-                  tooltip: 'Abmelden',
-                  onPressed: controller.disconnect,
-                  icon: const Icon(Icons.logout),
-                ),
-                const SizedBox(width: 12),
-              ]
-            : null,
+        title: const Text('Digital Signage'),
+        actions: [
+          if (_index == 0)
+            IconButton(
+              tooltip: 'Aktualisieren',
+              onPressed: widget.state.busy ? null : controller.refresh,
+              icon: const Icon(Icons.refresh),
+            ),
+          IconButton(
+            tooltip: 'Abmelden',
+            onPressed: controller.disconnect,
+            icon: const Icon(Icons.logout),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
       body: SafeArea(
-        child: state.hasSession
-            ? _Overview(state: state)
-            : const _ConnectionForm(),
+        child: IndexedStack(
+          index: _index,
+          children: [
+            _Overview(state: widget.state),
+            const MediaPage(),
+          ],
+        ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (index) => setState(() => _index = index),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            label: 'Übersicht',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.video_library_outlined),
+            label: 'Medien',
+          ),
+        ],
       ),
     );
   }

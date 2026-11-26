@@ -1,7 +1,8 @@
 # Raspberry Pi Digital Signage
 
 نظام محلي لإدارة شاشة إعلانية، يُنفَّذ تدريجيًا. أُنجز التحكم بالمشغل وإدارة الفيديوهات الأساسية.
-أُضيفت شاشة Flutter الألمانية **Übersicht** للتحكم بالمشغل. واجهة إدارة الفيديوهات والصور وقائمة التشغيل الدائمة والنشر مراحل لاحقة.
+أُضيفت شاشتا Flutter الألمانيتان **Übersicht** للتحكم بالمشغل و**Medien** لإدارة الفيديوهات.
+دعم الصور وقائمة التشغيل الدائمة والنشر مراحل لاحقة.
 
 ## المرحلة الأولى
 
@@ -23,9 +24,11 @@ backend/tests/test_media_api.py
 python_project/main.py            # Original player, unchanged
 python_project/videos/            # Existing videos, reused by default
 lib/models/player_status.dart     # Player response model and commands
-lib/services/player_api.dart      # HTTP client
+lib/services/signage_api.dart     # Shared authenticated API client
+lib/services/video_picker.dart    # Browser file selection and upload progress
 lib/providers/dashboard_provider.dart # Riverpod state and polling
 lib/features/dashboard/dashboard_page.dart # Connection form and overview
+lib/features/media/media_page.dart # Video list, upload and confirmed deletion
 ```
 
 ## التشغيل على Raspberry Pi
@@ -135,7 +138,7 @@ curl -X POST -H "Authorization: Bearer $SIGNAGE_API_TOKEN" http://127.0.0.1:8000
 إذا تعطلت MPV يظهر ذلك في الحالة، وطلب `start` التالي يعيد تشغيلها. الاستعادة التلقائية عبر systemd في مرحلة النشر.
 الخادم مربوط حاليًا بـloopback؛ الوصول المحلي وHTTPS عبر Nginx يُجهَّزان في مرحلة النشر، دون تعريض النظام للإنترنت.
 
-## واجهة Flutter — Übersicht
+## واجهة Flutter — Übersicht وMedien
 
 الواجهة تستخدم Material 3 وRiverpod وHTTP، مع تعريب مكونات Flutter إلى الألمانية.
 تعرض اتصال الخادم، حالة المشغل، الملف الحالي وعدد الفيديوهات، وتدعم أوامر التشغيل السبعة.
@@ -186,7 +189,23 @@ flutter test
 
 تغطي الاختبارات الدخول، الأوامر السبعة، المفاتيح غير الصحيحة، انقطاع الاتصال والتعافي،
 تعطيل التشغيل عند غياب الفيديوهات، والتخطيط على شاشة بعرض 320 بكسل.
-شاشة **Medien** ستكون الخطوة التالية؛ وظائفها متاحة حاليًا عبر API فقط.
+تغطي اختبارات Medien عرض الملفات، وتأكيد الحذف وإلغاءه، ورفض حذف الملفات المستخدمة،
+وتقدم الرفع وفشله واستمراره عند تبديل الشاشة، وإلغاء النقل عند تسجيل الخروج، وانتهاء الجلسة.
+
+### إدارة الفيديوهات من الواجهة
+
+بعد تسجيل الدخول اختر **Medien** من شريط التنقل:
+
+1. اضغط **Video hochladen** واختر MP4 أو MKV أو MOV أو WebM.
+2. يظهر شريط تقدم النقل، ثم **Video wird geprüft …** حتى يقبل الخادم الملف.
+3. يظهر الفيديو في القائمة مع حجمه؛ الأسماء الموجودة تُرفض دون استبدال ملفاتها.
+4. للحذف اضغط أيقونة سلة المهملات بجوار الفيديو، ثم **Löschen** للتأكيد أو **Abbrechen** للإلغاء.
+
+رفع ملف واحد في كل مرة يبقي التعامل واضحًا. يستمر الرفع عند الانتقال إلى Übersicht،
+ويُلغى عند تسجيل الخروج أو إغلاق الصفحة. إذا كان الملف ضمن قائمة التشغيل المحملة،
+أوقف العرض من Übersicht قبل حذفه. الرفع لا يغيّر الفيديو الجاري عرضه.
+زر **Dateien aktualisieren** يجلب التغييرات التي أُجريت من جهاز آخر.
+حزمة `web` تتيح اختيار الملف وقياس تقدم النقل مباشرةً في المتصفح، دون تحميل الفيديو كاملًا إلى ذاكرة Dart.
 
 ## إدارة الفيديوهات
 
@@ -254,3 +273,4 @@ backend/.venv/bin/python -m unittest discover -s backend/tests -v
 مراجع: [MPV وخيارات JSON IPC](https://mpv.io/manual/stable/)، [FastAPI lifespan](https://fastapi.tiangolo.com/advanced/events/)، [اختبار دورة حياة الخادم](https://fastapi.tiangolo.com/advanced/testing-events/).
 الرفع التدريجي موضح في [Starlette Requests](https://starlette.dev/requests/)، وفحص المسارات في [FFprobe](https://ffmpeg.org/ffprobe.html).
 إعداد اتصال المتصفح في [FastAPI CORS](https://fastapi.tiangolo.com/tutorial/cors/)، وإدارة الموارد في [Riverpod Refs](https://riverpod.dev/docs/concepts2/refs).
+قياس تقدم النقل موضح في [XMLHttpRequest upload](https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/upload).

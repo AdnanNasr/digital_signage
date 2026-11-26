@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/player_status.dart';
-import '../services/player_api.dart';
+import '../services/signage_api.dart';
 
 final httpClientProvider = Provider<http.Client>((ref) {
   final client = http.Client();
@@ -33,7 +33,8 @@ class DashboardState {
 }
 
 class DashboardController extends Notifier<DashboardState> {
-  PlayerApi? _api;
+  SignageApi? _api;
+  SignageApi? get api => _api;
   Timer? _timer;
   int _generation = 0;
 
@@ -48,7 +49,7 @@ class DashboardController extends Notifier<DashboardState> {
 
   Future<void> connect(Uri url, String token) async {
     if (state.busy) return;
-    _api = PlayerApi(url, token, ref.read(httpClientProvider));
+    _api = SignageApi(url, token, ref.read(httpClientProvider));
     await _update(initial: true);
     if (ref.mounted && state.hasSession) {
       _timer?.cancel();
@@ -107,5 +108,12 @@ class DashboardController extends Notifier<DashboardState> {
     _timer?.cancel();
     _api = null;
     state = const DashboardState();
+  }
+
+  void expireSession() {
+    disconnect();
+    state = const DashboardState(
+      error: 'Das Passwort ist ungültig. Bitte erneut anmelden.',
+    );
   }
 }
