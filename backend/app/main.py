@@ -4,10 +4,11 @@ import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from .config import Settings
+from .config import Settings, get_allowed_origins
 from .routes.player import router
 from .routes.media import router as media_router
 from .services.media import MediaService
@@ -30,6 +31,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             player.close()
 
     app = FastAPI(title="Digital Signage", version="0.1.0", lifespan=lifespan)
+    # CORS settings do not require loading or creating the API token at import time.
+    origins = settings.allowed_origins if settings else get_allowed_origins()
+    app.add_middleware(CORSMiddleware, allow_origins=list(origins),
+                       allow_methods=["GET", "POST", "DELETE"],
+                       allow_headers=["Authorization", "Content-Type"])
 
     def authorize(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
         if credentials is None or not secrets.compare_digest(

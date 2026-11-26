@@ -7,6 +7,12 @@ from pathlib import Path
 from python_project.main import get_path
 
 
+def get_allowed_origins() -> tuple[str, ...]:
+    return tuple(origin.strip() for origin in os.environ.get(
+        "SIGNAGE_ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080"
+    ).split(",") if origin.strip())
+
+
 def load_api_token(runtime_dir: Path) -> str:
     configured = os.environ.get("SIGNAGE_API_TOKEN")
     if configured is not None:
@@ -35,6 +41,7 @@ class Settings:
     ipc_timeout: float = 3.0
     max_upload_bytes: int = 512 * 1024 * 1024
     ffprobe_binary: str = "ffprobe"
+    allowed_origins: tuple[str, ...] = ("http://localhost:8080", "http://127.0.0.1:8080")
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -54,4 +61,5 @@ class Settings:
             mpv_binary=os.environ.get("SIGNAGE_MPV_BINARY", "mpv"),
             max_upload_bytes=max_upload_mb * 1024 * 1024,
             ffprobe_binary=os.environ.get("SIGNAGE_FFPROBE_BINARY", "ffprobe"),
+            allowed_origins=get_allowed_origins(),
         )

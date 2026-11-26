@@ -40,6 +40,20 @@ class ApiFixture(unittest.TestCase):
 
 
 class ApiTests(ApiFixture):
+    def test_cors_allows_local_dashboard_without_bypassing_auth(self):
+        headers = {"Origin": "http://localhost:8080",
+                   "Access-Control-Request-Method": "POST",
+                   "Access-Control-Request-Headers": "authorization"}
+        response = self.client.options("/api/player/start", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["access-control-allow-origin"], "http://localhost:8080")
+        headers["Origin"] = "https://untrusted.example"
+        self.assertEqual(self.client.options("/api/player/start", headers=headers).status_code, 400)
+        del self.client.headers["Authorization"]
+        response = self.client.post("/api/player/start", headers={"Origin": "http://localhost:8080"})
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.headers["access-control-allow-origin"], "http://localhost:8080")
+
     def test_health_and_authentication(self):
         with TestClient(create_app(Settings(
             self.videos, Path(self.temp.name) / "other", "secret" * 8

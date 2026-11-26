@@ -1,7 +1,7 @@
 # Raspberry Pi Digital Signage
 
 نظام محلي لإدارة شاشة إعلانية، يُنفَّذ تدريجيًا. أُنجز التحكم بالمشغل وإدارة الفيديوهات الأساسية.
-تطبيق Flutter ما زال القالب الأولي؛ الواجهة والصور وقائمة التشغيل الدائمة والنشر مراحل لاحقة.
+أُضيفت شاشة Flutter الألمانية **Übersicht** للتحكم بالمشغل. واجهة إدارة الفيديوهات والصور وقائمة التشغيل الدائمة والنشر مراحل لاحقة.
 
 ## المرحلة الأولى
 
@@ -22,6 +22,10 @@ backend/tests/test_player_api.py
 backend/tests/test_media_api.py
 python_project/main.py            # Original player, unchanged
 python_project/videos/            # Existing videos, reused by default
+lib/models/player_status.dart     # Player response model and commands
+lib/services/player_api.dart      # HTTP client
+lib/providers/dashboard_provider.dart # Riverpod state and polling
+lib/features/dashboard/dashboard_page.dart # Connection form and overview
 ```
 
 ## التشغيل على Raspberry Pi
@@ -88,6 +92,7 @@ backend/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port
 | `SIGNAGE_MPV_BINARY` | `mpv` | الملف التنفيذي |
 | `SIGNAGE_MAX_UPLOAD_MB` | `512` | الحد الأقصى للفيديو المرفوع بالميبيبايت (MiB) |
 | `SIGNAGE_FFPROBE_BINARY` | `ffprobe` | أداة فحص الفيديو، تأتي مع FFmpeg |
+| `SIGNAGE_ALLOWED_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | مصادر الواجهة المسموح بها، مفصولة بفاصلة |
 
 استخدم مسارًا قصيرًا لمجلد التشغيل بسبب حد طول Unix sockets.
 ترتيب الفيديوهات أبجدي حسب الدالة الأصلية؛ الصيغ MP4 وMKV وMOV وWebM.
@@ -126,6 +131,59 @@ curl -X POST -H "Authorization: Bearer $SIGNAGE_API_TOKEN" http://127.0.0.1:8000
 إغلاق المتصفح لا يوقف العرض. إيقاف خادم API نفسه ينهي MPV الذي يملكه.
 إذا تعطلت MPV يظهر ذلك في الحالة، وطلب `start` التالي يعيد تشغيلها. الاستعادة التلقائية عبر systemd في مرحلة النشر.
 الخادم مربوط حاليًا بـloopback؛ الوصول المحلي وHTTPS عبر Nginx يُجهَّزان في مرحلة النشر، دون تعريض النظام للإنترنت.
+
+## واجهة Flutter — Übersicht
+
+الواجهة تستخدم Material 3 وRiverpod وHTTP، مع تعريب مكونات Flutter إلى الألمانية.
+تعرض اتصال الخادم، حالة المشغل، الملف الحالي وعدد الفيديوهات، وتدعم أوامر التشغيل السبعة.
+تتحدث الحالة كل خمس ثوانٍ، وتُعطَّل الأوامر عند انقطاع الاتصال أو أثناء الطلب الجاري.
+رمز الوصول يبقى في ذاكرة الجلسة فقط؛ لا يُحفظ في المتصفح ولا يُضمَّن داخل ملفات البناء.
+تسجيل الخروج أو إغلاق الصفحة لا يوقف MPV.
+
+للتجربة على الـMac، شغّل الخادم في Terminal أولى:
+
+```bash
+backend/.venv/bin/python backend/run.py
+```
+
+في Terminal ثانية من جذر المشروع:
+
+```bash
+flutter pub get
+flutter run -d chrome --web-hostname 127.0.0.1 --web-port 8080 \
+  --dart-define=API_BASE_URL=http://127.0.0.1:8000 --no-web-resources-cdn
+```
+
+الواجهة على `http://127.0.0.1:8080`، والخادم على `http://127.0.0.1:8000`.
+في شاشة الاتصال استخدم عنوان الخادم، والصق المفتاح من الملف المحلي:
+
+```bash
+cat backend/runtime/api-token
+```
+
+إذا عيّنت `SIGNAGE_API_TOKEN` يدويًا، استخدم تلك القيمة بدل الملف.
+إذا غيّرت منفذ الواجهة، أضف مصدرها الكامل إلى `SIGNAGE_ALLOWED_ORIGINS` ثم أعد تشغيل الخادم.
+لم يُفتح الخادم لأجهزة الشبكة الأخرى بعد؛ إعداد Nginx سيكون في مرحلة النشر.
+
+لبناء نسخة بموارد محلية قابلة للاستضافة لاحقًا دون CDN:
+
+```bash
+flutter build web --release --no-web-resources-cdn
+```
+
+عند عدم تحديد `API_BASE_URL`، تقترح الواجهة عنوان استضافتها نفسه للـAPI، ليناسب Nginx لاحقًا.
+لا تضع رمز الوصول في `--dart-define`؛ أدخله في شاشة الاتصال.
+
+للتحقق من الواجهة:
+
+```bash
+flutter analyze
+flutter test
+```
+
+تغطي الاختبارات الدخول، الأوامر السبعة، المفاتيح غير الصحيحة، انقطاع الاتصال والتعافي،
+تعطيل التشغيل عند غياب الفيديوهات، والتخطيط على شاشة بعرض 320 بكسل.
+شاشة **Medien** ستكون الخطوة التالية؛ وظائفها متاحة حاليًا عبر API فقط.
 
 ## إدارة الفيديوهات
 
@@ -192,3 +250,4 @@ backend/.venv/bin/python -m unittest discover -s backend/tests -v
 
 مراجع: [MPV وخيارات JSON IPC](https://mpv.io/manual/stable/)، [FastAPI lifespan](https://fastapi.tiangolo.com/advanced/events/)، [اختبار دورة حياة الخادم](https://fastapi.tiangolo.com/advanced/testing-events/).
 الرفع التدريجي موضح في [Starlette Requests](https://starlette.dev/requests/)، وفحص المسارات في [FFprobe](https://ffmpeg.org/ffprobe.html).
+إعداد اتصال المتصفح في [FastAPI CORS](https://fastapi.tiangolo.com/tutorial/cors/)، وإدارة الموارد في [Riverpod Refs](https://riverpod.dev/docs/concepts2/refs).

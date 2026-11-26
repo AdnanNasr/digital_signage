@@ -1,12 +1,11 @@
 {
-    "name": "digital_signage",
-    "short_name": "digital_signage",
+    "name": "Digital Signage",
+    "short_name": "Signage",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#F4F6F5",
+    "theme_color": "#12695C",
+    "description": "Ihre Anzeige im lokalen Netzwerk verwalten.",
     "prefer_related_applications": false,
     "icons": [
         {
