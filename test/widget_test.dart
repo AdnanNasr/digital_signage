@@ -63,7 +63,7 @@ Future<void> openApp(
 }
 
 Future<void> login(WidgetTester tester) async {
-  await tester.enterText(find.byKey(const Key('access-token')), 'a' * 40);
+  await tester.enterText(find.byKey(const Key('access-token')), 'DemoPass123');
   await tester.ensureVisible(find.text('Verbinden'));
   await tester.tap(find.text('Verbinden'));
   await tester.pumpAndSettle();
@@ -158,10 +158,7 @@ void main() {
     final server = FakeServer()..unauthorized = true;
     await openApp(tester, server);
     await login(tester);
-    expect(
-      find.textContaining('Zugangsschlüssel ist ungültig'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Passwort ist ungültig'), findsOneWidget);
     expect(find.text('Übersicht'), findsNothing);
     await closeApp(tester);
   });

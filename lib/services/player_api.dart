@@ -36,7 +36,7 @@ class PlayerApi {
               .timeout(const Duration(seconds: 8));
       if (response.statusCode == 401) {
         throw const ApiException(
-          'Der Zugangsschlüssel ist ungültig. Bitte erneut anmelden.',
+          'Das Passwort ist ungültig. Bitte erneut anmelden.',
           401,
         );
       }

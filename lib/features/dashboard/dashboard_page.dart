@@ -105,7 +105,7 @@ class _ConnectionFormState extends ConsumerState<_ConnectionForm> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Geben Sie die Server-Adresse und Ihren Zugangsschlüssel ein.',
+                      'Geben Sie die Server-Adresse und Ihr Passwort ein.',
                     ),
                     const SizedBox(height: 24),
                     TextFormField(
@@ -146,11 +146,11 @@ class _ConnectionFormState extends ConsumerState<_ConnectionForm> {
                         if (!state.busy) _connect();
                       },
                       decoration: InputDecoration(
-                        labelText: 'Zugangsschlüssel',
+                        labelText: 'Passwort',
                         suffixIcon: IconButton(
                           tooltip: _showToken
-                              ? 'Schlüssel verbergen'
-                              : 'Schlüssel anzeigen',
+                              ? 'Passwort verbergen'
+                              : 'Passwort anzeigen',
                           onPressed: () =>
                               setState(() => _showToken = !_showToken),
                           icon: Icon(
@@ -160,8 +160,8 @@ class _ConnectionFormState extends ConsumerState<_ConnectionForm> {
                           ),
                         ),
                       ),
-                      validator: (value) => (value?.trim().length ?? 0) < 32
-                          ? 'Der Schlüssel muss mindestens 32 Zeichen enthalten.'
+                      validator: (value) => (value?.trim().length ?? 0) < 8
+                          ? 'Das Passwort muss mindestens 8 Zeichen enthalten.'
                           : null,
                     ),
                     const SizedBox(height: 20),

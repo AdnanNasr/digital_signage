@@ -49,8 +49,8 @@ class Settings:
             "SIGNAGE_RUNTIME_DIR", str(Path(__file__).resolve().parents[1] / "runtime")
         )).resolve()
         token = load_api_token(runtime_dir)
-        if len(token) < 32:
-            raise ValueError("SIGNAGE_API_TOKEN muss mindestens 32 Zeichen enthalten.")
+        if len(token) < 8:
+            raise ValueError("SIGNAGE_API_TOKEN muss mindestens 8 Zeichen enthalten.")
         max_upload_mb = int(os.environ.get("SIGNAGE_MAX_UPLOAD_MB", "512"))
         if max_upload_mb < 1:
             raise ValueError("SIGNAGE_MAX_UPLOAD_MB muss mindestens 1 sein.")

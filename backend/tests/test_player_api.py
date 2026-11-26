@@ -95,6 +95,15 @@ class ApiTests(ApiFixture):
             with self.assertRaises(ValueError):
                 Settings.from_env()
 
+    def test_custom_password_can_authenticate(self):
+        with patch.dict(os.environ, {"SIGNAGE_API_TOKEN": "DemoPass123"}):
+            settings = Settings.from_env()
+        settings = Settings(settings.videos_dir, Path(self.temp.name) / "password-runtime", settings.api_token)
+        with TestClient(create_app(settings)) as client:
+            self.assertEqual(client.get("/api/player/status").status_code, 401)
+            client.headers["Authorization"] = f"Bearer {settings.api_token}"
+            self.assertEqual(client.get("/api/player/status").status_code, 200)
+
     def test_missing_token_is_created_and_persisted(self):
         runtime = Path(self.temp.name) / "settings"
         with patch.dict(os.environ, {"SIGNAGE_RUNTIME_DIR": str(runtime)}):
