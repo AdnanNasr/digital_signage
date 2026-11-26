@@ -43,19 +43,26 @@ sudo apt update
 sudo apt install python3-venv mpv
 python3 -m venv backend/.venv
 backend/.venv/bin/python -m pip install -r backend/requirements.txt
-export SIGNAGE_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 backend/.venv/bin/python backend/run.py
 ```
 
-احتفظ بالرمز نفسه لإعداد التشغيل الدائم لاحقًا؛ يجب ألا يقل طوله عن 32 حرفًا.
-لتجربة الطلبات افتح Terminal ثانية وعيّن `SIGNAGE_API_TOKEN` إلى الرمز نفسه.
+عند غياب `SIGNAGE_API_TOKEN`، ينشئ الخادم رمزًا آمنًا تلقائيًا في `backend/runtime/api-token`
+بصلاحيات `600` ويعيد استخدامه عند التشغيل التالي. مجلد `runtime` مستبعد من Git.
+لتجربة الطلبات افتح Terminal ثانية في جذر المشروع:
+
+```bash
+export SIGNAGE_API_TOKEN="$(cat backend/runtime/api-token)"
+```
+
+يمكن تحديد رمز خاص عبر متغير البيئة؛ له الأولوية على الملف ويجب ألا يقل طوله عن 32 حرفًا.
+إذا حددت `SIGNAGE_RUNTIME_DIR`، يُحفظ الملف في ذلك المجلد.
 لا تشغّل `python_project/main.py` بالتزامن مع الخادم؛ فهو مشغل مستقل عن إدارة الـAPI.
 لا تستخدم `--reload` أو أكثر من worker للشاشة. القفل يمنع خادمين يستخدمان مجلد التشغيل نفسه.
 
 ### إعداد التشغيل في IDE
 
-اختر `backend/run.py` ملف التشغيل و`backend/.venv/bin/python` مفسّر Python، واضبط
-`SIGNAGE_API_TOKEN` ضمن متغيرات البيئة. ملف التشغيل يحدد جذر المشروع تلقائيًا، حتى لو اختلف مجلد العمل.
+اختر `backend/run.py` ملف التشغيل و`backend/.venv/bin/python` مفسّر Python.
+لا يلزم تعيين رمز يدويًا؛ ملف التشغيل يحدد جذر المشروع تلقائيًا، حتى لو اختلف مجلد العمل.
 يمكن اختيار منفذ آخر بإضافة `--port 8001`.
 
 عند استخدام إعداد Uvicorn أو FastAPI في IDE، عيّن التطبيق إلى `backend.app.main:app`
@@ -72,7 +79,7 @@ backend/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port
 
 | المتغير | الافتراضي | الغرض |
 |---|---|---|
-| `SIGNAGE_API_TOKEN` | مطلوب | رمز الوصول |
+| `SIGNAGE_API_TOKEN` | رمز محلي يُنشأ تلقائيًا | رمز وصول مخصص اختياري |
 | `SIGNAGE_VIDEOS_DIR` | `python_project/videos` | مجلد الفيديوهات |
 | `SIGNAGE_RUNTIME_DIR` | `backend/runtime` | مجلد خاص لمقبس IPC والقفل |
 | `SIGNAGE_MPV_BINARY` | `mpv` | الملف التنفيذي |

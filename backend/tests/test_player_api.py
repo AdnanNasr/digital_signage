@@ -79,6 +79,39 @@ class ApiTests(ApiFixture):
             with self.assertRaises(ValueError):
                 Settings.from_env()
 
+    def test_missing_token_is_created_and_persisted(self):
+        runtime = Path(self.temp.name) / "settings"
+        with patch.dict(os.environ, {"SIGNAGE_RUNTIME_DIR": str(runtime)}):
+            os.environ.pop("SIGNAGE_API_TOKEN", None)
+            first = Settings.from_env()
+            second = Settings.from_env()
+        self.assertGreaterEqual(len(first.api_token), 32)
+        self.assertEqual(first.api_token, second.api_token)
+        self.assertEqual((runtime / "api-token").read_text().strip(), first.api_token)
+        self.assertEqual((runtime / "api-token").stat().st_mode & 0o777, 0o600)
+        self.assertEqual(runtime.stat().st_mode & 0o777, 0o700)
+        with TestClient(create_app(first)) as client:
+            self.assertEqual(client.get("/api/player/status").status_code, 401)
+            client.headers["Authorization"] = f"Bearer {first.api_token}"
+            self.assertEqual(client.get("/api/player/status").status_code, 200)
+
+    def test_concurrent_settings_share_one_generated_token(self):
+        runtime = Path(self.temp.name) / "concurrent-settings"
+        with patch.dict(os.environ, {"SIGNAGE_RUNTIME_DIR": str(runtime)}):
+            os.environ.pop("SIGNAGE_API_TOKEN", None)
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                tokens = list(executor.map(lambda _: Settings.from_env().api_token, range(6)))
+        self.assertEqual(len(set(tokens)), 1)
+
+    def test_explicit_token_takes_priority(self):
+        runtime = Path(self.temp.name) / "custom-settings"
+        token = "custom-token-" * 4
+        with patch.dict(os.environ, {
+            "SIGNAGE_RUNTIME_DIR": str(runtime), "SIGNAGE_API_TOKEN": token,
+        }):
+            self.assertEqual(Settings.from_env().api_token, token)
+        self.assertFalse(runtime.exists())
+
 
 @unittest.skipUnless(shutil.which("mpv") and shutil.which("ffmpeg"), "MPV and FFmpeg are required")
 class RealMpvTests(ApiFixture):
