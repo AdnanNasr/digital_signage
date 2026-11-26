@@ -102,6 +102,20 @@ class SignageApi {
     );
   }
 
+  Future<Map<String, dynamic>> displayRequest(
+    String endpoint, {
+    String method = 'GET',
+    Map<String, Object?>? body,
+  }) async => _decode(
+    await _request(
+      baseUrl.resolve('/api/display/$endpoint'),
+      method: method,
+      body: body,
+      timeout: const Duration(seconds: 40),
+    ),
+    (data) => data as Map<String, dynamic>,
+  );
+
   T _decode<T>(http.Response response, T Function(Object?) decode) {
     try {
       return decode(jsonDecode(utf8.decode(response.bodyBytes)));

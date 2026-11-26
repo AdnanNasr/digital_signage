@@ -44,6 +44,7 @@ class PlayerService:
         self._ownership = None
         self.playlist_source: Callable[[], PlaybackPlan | None] | None = None
         self._current_plan: PlaybackPlan | None = None
+        self.fit_mode = "contain"
 
     @property
     def lock(self):
@@ -94,6 +95,8 @@ class PlayerService:
                 "--idle=yes", "--force-window=immediate", "--background-color=#000000",
                 "--no-terminal", "--osc=no", "--osd-level=0", "--input-default-bindings=no",
                 f"--input-ipc-server={self.socket_path}",
+                f"--keepaspect={'no' if self.fit_mode == 'stretch' else 'yes'}",
+                f"--panscan={1 if self.fit_mode == 'cover' else 0}",
             ], stdin=subprocess.DEVNULL)
         except OSError as error:
             raise PlayerError("MPV konnte nicht gestartet werden. Bitte Installation prüfen.") from error
@@ -108,6 +111,35 @@ class PlayerService:
                 time.sleep(0.05)
         self._terminate()
         raise PlayerError("MPV ist nicht bereit. Bitte die Bildschirm-Sitzung prüfen.")
+
+    def current_fit_mode(self) -> str:
+        with self._lock:
+            if self._process is not None and self._process.poll() is None:
+                aspect = self._command('get_property', 'keepaspect')
+                scan = self._command('get_property', 'panscan')
+                return 'stretch' if not aspect else ('cover' if scan == 1 else 'contain' if scan == 0 else 'custom')
+            return self.fit_mode
+
+    def set_fit_mode(self, mode: str) -> None:
+        properties = {
+            'contain': {'keepaspect': True, 'panscan': 0.0},
+            'cover': {'keepaspect': True, 'panscan': 1.0},
+            'stretch': {'keepaspect': False, 'panscan': 0.0},
+        }
+        if mode not in properties:
+            raise PlayerError('Ungültige Bildschirmdarstellung.', 422)
+        with self._lock:
+            if self._process is not None and self._process.poll() is None:
+                previous = {name: self._command('get_property', name)
+                            for name in properties[mode]}
+                try:
+                    for name, value in properties[mode].items():
+                        self._command('set_property', name, value)
+                except PlayerError:
+                    for name, value in previous.items():
+                        self._command('set_property', name, value)
+                    raise
+            self.fit_mode = mode
 
     def _videos(self) -> list[Path]:
         root = self.settings.videos_dir.resolve()

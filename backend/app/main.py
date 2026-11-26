@@ -16,6 +16,8 @@ from .routes.playlists import router as playlists_router
 from .services.media import MediaService
 from .services.player import PlayerError, PlayerService
 from .services.playlists import PlaylistService
+from .services.display import DisplayService
+from .routes.display import router as display_router
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -27,7 +29,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         player = PlayerService(app.state.settings)
         player.open()
         app.state.player = player
+        display = None
         try:
+            display = DisplayService(app.state.settings, player)
+            app.state.display = display
+            display.start()
             media = MediaService(app.state.settings, player)
             app.state.media = media
             playlists = PlaylistService(app.state.settings, media)
@@ -36,6 +42,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             media.deletion_check = playlists.ensure_media_unused
             yield
         finally:
+            if display:
+                display.close()
             player.close()
 
     app = FastAPI(title="Digital Signage", version="0.1.0", lifespan=lifespan)
@@ -57,7 +65,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def invalid_input(request: Request, error: RequestValidationError):
-        return JSONResponse(status_code=422, content={"detail": "Ungültige Angaben. Bitte Name, Dateien und Bilddauer prüfen."})
+        message = ("Ungültige Angaben. Bitte Bildschirm, Ausrichtung und Darstellung prüfen."
+                   if request.url.path.startswith("/api/display/") else
+                   "Ungültige Angaben. Bitte Name, Dateien und Bilddauer prüfen.")
+        return JSONResponse(status_code=422, content={"detail": message})
 
     @app.get("/api/health", tags=["System"])
     def health():
@@ -75,6 +86,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(router, dependencies=[Depends(authorize)])
     app.include_router(media_router, dependencies=[Depends(authorize)])
     app.include_router(playlists_router, dependencies=[Depends(authorize)])
+    app.include_router(display_router, dependencies=[Depends(authorize)])
     return app
 
 

@@ -6,6 +6,7 @@ import '../../core/widgets/shop_logo.dart';
 import '../../models/player_status.dart';
 import '../../providers/dashboard_provider.dart';
 import '../media/media_page.dart';
+import '../display/display_settings_page.dart';
 import '../playlists/playlists_page.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -72,12 +73,15 @@ class _SignedInDashboardState extends ConsumerState<_SignedInDashboard> {
                 _Overview(state: widget.state),
                 const MediaPage(),
                 PlaylistsPage(active: _index == 2),
+                DisplaySettingsPage(active: _index == 3),
               ],
             ),
           ),
           bottomNavigationBar: wide
               ? null
               : NavigationBar(
+                  labelBehavior:
+                      NavigationDestinationLabelBehavior.onlyShowSelected,
                   selectedIndex: _index,
                   onDestinationSelected: (index) =>
                       setState(() => _index = index),
@@ -99,6 +103,14 @@ class _SignedInDashboardState extends ConsumerState<_SignedInDashboard> {
                       ),
                       selectedIcon: Icon(Icons.playlist_play),
                       label: 'Listen',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(
+                        Icons.settings_outlined,
+                        key: Key('settings-tab'),
+                      ),
+                      selectedIcon: Icon(Icons.settings),
+                      label: 'Einstellungen',
                     ),
                   ],
                 ),
@@ -186,6 +198,13 @@ class _DesktopNavigation extends StatelessWidget {
                       width: 132,
                       child: Text('Wiedergabelisten', maxLines: 2),
                     ),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(
+                      Icons.settings_outlined,
+                      key: Key('settings-tab'),
+                    ),
+                    label: Text('Einstellungen'),
                   ),
                 ],
               ),
