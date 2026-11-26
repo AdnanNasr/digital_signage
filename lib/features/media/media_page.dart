@@ -169,7 +169,7 @@ class _MediaPageState extends ConsumerState<MediaPage> {
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100),
+        constraints: const BoxConstraints(maxWidth: 1200),
         child: CustomScrollView(
           slivers: [
             SliverPadding(
@@ -179,31 +179,92 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
+                      'MEDIENBIBLIOTHEK',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colors.primary,
+                        letterSpacing: 1.6,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
                       'Ihre Videos',
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Videos hinzufügen oder vom Gerät entfernen. MP4, MKV, MOV und WebM werden unterstützt.',
+                      'Ihre Inhalte, übersichtlich organisiert und jederzeit griffbereit.',
                     ),
                     const SizedBox(height: 20),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: _working || _loading
-                              ? null
-                              : _chooseAndUpload,
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text('Video hochladen'),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEDF5EF),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(
+                                    Icons.cloud_upload_outlined,
+                                    color: colors.primary,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Neue Videos hinzufügen',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleLarge,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'MP4, MKV, MOV und WebM',
+                                        style: TextStyle(
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: _working || _loading
+                                      ? null
+                                      : _chooseAndUpload,
+                                  icon: const Icon(Icons.upload_file),
+                                  label: const Text('Video hochladen'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: _working || _loading
+                                      ? null
+                                      : _load,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Dateien aktualisieren'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        OutlinedButton.icon(
-                          onPressed: _working || _loading ? null : _load,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Dateien aktualisieren'),
-                        ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 20),
                     if (_progress != null)
@@ -264,10 +325,23 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                         semanticsLabel: 'Videos werden geladen',
                       ),
                     if (!_loading && _files.isEmpty && _error == null)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 32),
-                        child: Text(
-                          'Noch keine Videos vorhanden. Laden Sie Ihr erstes Video hoch.',
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.video_library_outlined,
+                                size: 44,
+                                color: colors.primary,
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Noch keine Videos vorhanden. Laden Sie Ihr erstes Video hoch.',
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     if (_files.isNotEmpty) ...[
@@ -292,41 +366,59 @@ class _MediaPageState extends ConsumerState<MediaPage> {
                 itemCount: _files.length,
                 itemBuilder: (context, index) {
                   final file = _files[index];
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Icon(Icons.movie_outlined, color: colors.primary),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Tooltip(
-                                  message: file.name,
-                                  child: Text(
-                                    file.name,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(file.formattedSize),
-                              ],
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 56,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEDF5EF),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.movie_outlined,
+                                color: colors.primary,
+                              ),
                             ),
-                          ),
-                          IconButton(
-                            tooltip: '${file.name} löschen',
-                            onPressed: _working || _loading
-                                ? null
-                                : () => _delete(file),
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-                        ],
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Tooltip(
+                                    message: file.name,
+                                    child: Text(
+                                      file.name,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(file.formattedSize),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: '${file.name} löschen',
+                              style: IconButton.styleFrom(
+                                foregroundColor: colors.error,
+                              ),
+                              onPressed: _working || _loading
+                                  ? null
+                                  : () => _delete(file),
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );

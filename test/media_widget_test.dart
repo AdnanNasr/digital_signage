@@ -180,6 +180,10 @@ void main() {
       expect(find.text('Wird hochgeladen … 50 %'), findsOneWidget);
       expect(upload.url!.queryParameters['filename'], upload.name);
       expect(upload.token, 'DemoPass123');
+      tester.view.physicalSize = const Size(700, 900);
+      await tester.pumpAndSettle();
+      expect(upload.cancelled, isFalse);
+      expect(find.text('Wird hochgeladen … 50 %'), findsOneWidget);
       upload.progress!(1);
       await tester.pump();
       expect(find.text('Video wird geprüft …'), findsOneWidget);
@@ -248,6 +252,10 @@ void main() {
         150,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.ensureVisible(
+        find.byTooltip('Grüße & Angebote.mp4 löschen'),
+      );
+      await tester.pump();
       await tester.tap(find.byTooltip('Grüße & Angebote.mp4 löschen'));
       await tester.pumpAndSettle();
       expect(find.text('Video löschen?'), findsOneWidget);

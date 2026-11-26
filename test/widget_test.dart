@@ -79,6 +79,7 @@ Future<void> tapControl(WidgetTester tester, String label) async {
     );
   }
   await tester.ensureVisible(find.text(label));
+  await tester.pump();
   await tester.tap(find.text(label));
   await tester.pumpAndSettle();
 }
@@ -89,6 +90,18 @@ Future<void> closeApp(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('enlarged text remains usable without layout overflow', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.8;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await openApp(tester, FakeServer());
+    await login(tester);
+    await tapControl(tester, 'Wiedergabe starten');
+    expect(tester.takeException(), isNull);
+    await closeApp(tester);
+  });
+
   testWidgets('connects and sends all playback commands', (tester) async {
     final server = FakeServer();
     await openApp(tester, server);
