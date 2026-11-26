@@ -1,3 +1,5 @@
+import errno
+import logging
 import secrets
 from contextlib import asynccontextmanager
 
@@ -7,6 +9,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .config import Settings
 from .routes.player import router
+from .routes.media import router as media_router
+from .services.media import MediaService
 from .services.player import PlayerError, PlayerService
 
 bearer = HTTPBearer(auto_error=False)
@@ -19,6 +23,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         player = PlayerService(app.state.settings)
         player.open()
         app.state.player = player
+        app.state.media = MediaService(app.state.settings, player)
         try:
             yield
         finally:
@@ -40,7 +45,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health():
         return {"status": "ok"}
 
+    @app.exception_handler(OSError)
+    async def storage_error(request: Request, error: OSError):
+        logging.getLogger(__name__).exception("File operation failed", exc_info=error)
+        full = error.errno in {errno.ENOSPC, errno.EDQUOT}
+        return JSONResponse(
+            status_code=507 if full else 500,
+            content={"detail": "Nicht genügend Speicherplatz." if full else "Dateizugriff fehlgeschlagen."},
+        )
+
     app.include_router(router, dependencies=[Depends(authorize)])
+    app.include_router(media_router, dependencies=[Depends(authorize)])
     return app
 
 

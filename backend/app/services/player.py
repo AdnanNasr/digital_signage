@@ -5,6 +5,7 @@ import socket
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from python_project.main import get_videos
@@ -170,6 +171,18 @@ class PlayerService:
     def _status(self, state, label, reachable, filename=None) -> dict:
         return {"state": state, "label": label, "reachable": reachable,
                 "current_file": filename, "video_count": len(self._videos())}
+
+    @contextmanager
+    def guard_media_deletion(self, path: Path):
+        # Hold the command lock until deletion finishes, so start cannot race it.
+        with self._lock:
+            if self._process is not None and self._process.poll() is None:
+                playlist = self._command("get_property", "playlist")
+                if any(Path(entry["filename"]).resolve() == path.resolve() for entry in playlist):
+                    raise PlayerError(
+                        "Die Datei ist in der Wiedergabe. Bitte zuerst die Wiedergabe stoppen.", 409
+                    )
+            yield
 
     def _terminate(self) -> None:
         if self._process is not None:

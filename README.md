@@ -1,7 +1,7 @@
 # Raspberry Pi Digital Signage
 
-نظام محلي لإدارة شاشة إعلانية، يُنفَّذ تدريجيًا. المرحلة الحالية: **Backend und Player**.
-تطبيق Flutter ما زال القالب الأولي؛ إدارة الوسائط والواجهة وقائمة التشغيل الدائمة والنشر مراحل لاحقة.
+نظام محلي لإدارة شاشة إعلانية، يُنفَّذ تدريجيًا. أُنجز التحكم بالمشغل وإدارة الفيديوهات الأساسية.
+تطبيق Flutter ما زال القالب الأولي؛ الواجهة والصور وقائمة التشغيل الدائمة والنشر مراحل لاحقة.
 
 ## المرحلة الأولى
 
@@ -16,7 +16,10 @@ backend/app/config.py             # Environment configuration
 backend/app/main.py               # App lifecycle and authentication
 backend/app/routes/player.py      # Player endpoints
 backend/app/services/player.py    # MPV process ownership and JSON IPC
+backend/app/routes/media.py       # Video management endpoints
+backend/app/services/media.py     # Video validation and storage
 backend/tests/test_player_api.py
+backend/tests/test_media_api.py
 python_project/main.py            # Original player, unchanged
 python_project/videos/            # Existing videos, reused by default
 ```
@@ -40,7 +43,7 @@ cd digital_signage
 
 ```bash
 sudo apt update
-sudo apt install python3-venv mpv
+sudo apt install python3-venv mpv ffmpeg
 python3 -m venv backend/.venv
 backend/.venv/bin/python -m pip install -r backend/requirements.txt
 backend/.venv/bin/python backend/run.py
@@ -83,6 +86,8 @@ backend/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port
 | `SIGNAGE_VIDEOS_DIR` | `python_project/videos` | مجلد الفيديوهات |
 | `SIGNAGE_RUNTIME_DIR` | `backend/runtime` | مجلد خاص لمقبس IPC والقفل |
 | `SIGNAGE_MPV_BINARY` | `mpv` | الملف التنفيذي |
+| `SIGNAGE_MAX_UPLOAD_MB` | `512` | الحد الأقصى للفيديو المرفوع بالميبيبايت (MiB) |
+| `SIGNAGE_FFPROBE_BINARY` | `ffprobe` | أداة فحص الفيديو، تأتي مع FFmpeg |
 
 استخدم مسارًا قصيرًا لمجلد التشغيل بسبب حد طول Unix sockets.
 ترتيب الفيديوهات أبجدي حسب الدالة الأصلية؛ الصيغ MP4 وMKV وMOV وWebM.
@@ -122,6 +127,49 @@ curl -X POST -H "Authorization: Bearer $SIGNAGE_API_TOKEN" http://127.0.0.1:8000
 إذا تعطلت MPV يظهر ذلك في الحالة، وطلب `start` التالي يعيد تشغيلها. الاستعادة التلقائية عبر systemd في مرحلة النشر.
 الخادم مربوط حاليًا بـloopback؛ الوصول المحلي وHTTPS عبر Nginx يُجهَّزان في مرحلة النشر، دون تعريض النظام للإنترنت.
 
+## إدارة الفيديوهات
+
+تستخدم المجلد نفسه دون قاعدة بيانات؛ اسم الملف هو معرّفه. جميع الطلبات تحتاج رمز الوصول.
+
+| الطريقة | المسار | الوظيفة |
+|---|---|---|
+| GET | `/api/media` | قائمة الفيديوهات مع الاسم والحجم بالبايت |
+| GET | `/api/media/{id}` | معلومات فيديو محدد |
+| POST | `/api/media/upload?filename=clip.mp4` | رفع فيديو |
+| DELETE | `/api/media/{id}?confirm=true` | حذف بعد التأكيد |
+
+الرفع يرسل بايتات الملف مباشرة في جسم الطلب، **دون multipart**، واسم الملف في query parameter.
+هذا يسمح بالكتابة التدريجية وحد الحجم دون مكتبة إضافية؛ يمكن للواجهة رفع عدة ملفات بطلب مستقل لكل ملف.
+أمثلة من Terminal ثانية بعد بدء الخادم:
+
+```bash
+export SIGNAGE_API_TOKEN="$(cat backend/runtime/api-token)"
+curl -H "Authorization: Bearer $SIGNAGE_API_TOKEN" http://127.0.0.1:8000/api/media
+curl -X POST -H "Authorization: Bearer $SIGNAGE_API_TOKEN" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary "@/path/to/clip.mp4" \
+  "http://127.0.0.1:8000/api/media/upload?filename=clip.mp4"
+```
+
+استبدل مسار المثال بمسار الفيديو لديك. استجابة الرفع الناجح `201` ومعلومات الملف.
+يُرفض الاسم الموجود بـ`409` دون استبداله، والمسارات غير الآمنة بـ`400`، والامتداد غير المدعوم بـ`415`،
+والملف الفارغ أو المزيف أو الصوتي فقط بـ`422`، وتجاوز الحجم بـ`413`، وغياب FFprobe بـ`503`، وامتلاء القرص بـ`507`.
+الحد مطبق أثناء استقبال البيانات أيضًا، حتى عند غياب `Content-Length`.
+يفحص FFprobe الحاوية ووجود مسار فيديو؛ لا يجري تحويلًا أو فك ترميز كامل لكل إطار.
+يُكتب الملف مؤقتًا ولا يراه المشغل إلا بعد اكتمال الرفع ونجاح الفحص. الرفع المنقطع ينظَّف تلقائيًا.
+
+للحذف، أوقف العرض إذا كان الفيديو ضمن القائمة المحملة، ثم أكّد الحذف:
+
+```bash
+curl -X POST -H "Authorization: Bearer $SIGNAGE_API_TOKEN" http://127.0.0.1:8000/api/player/stop
+curl -X DELETE -H "Authorization: Bearer $SIGNAGE_API_TOKEN" \
+  "http://127.0.0.1:8000/api/media/clip.mp4?confirm=true"
+```
+
+الحذف الناجح يعيد `204` دون محتوى. حماية القائمة تشمل الفيديو الحالي والمتوقف مؤقتًا والملفات المنتظرة؛
+طلب دون `confirm=true` يعيد `400`. ستعرض واجهة Flutter نافذة التأكيد لاحقًا.
+الفيديوهات الجديدة تدخل العرض عند بدء قائمة جديدة أو إعادة تشغيل المشغل؛ الرفع لا يقطع العرض الجاري.
+
 ## الاختبارات
 
 ```bash
@@ -132,6 +180,8 @@ backend/.venv/bin/python -m unittest discover -s backend/tests -v
 
 اختبارات التكامل تتطلب `mpv` و`ffmpeg`؛ بدونهما تظهر كتجاوزات. تُنشئ فيديوهات مؤقتة وتستخدم MPV دون نافذة أو صوت، ثم تنظف العمليات والملفات.
 تشمل المصادقة والتشغيل والتنقل والإيقاف والاستئناف وإعادة التشغيل والتعافي بعد التعطل وطلبات التشغيل المتزامنة.
+تشمل إدارة الفيديوهات الصيغ الأربع، الملفات المزيفة والصوتية، حدود الحجم والرفع المنقطع،
+والأسماء غير الآمنة والروابط الرمزية، ومنع الحذف أثناء التشغيل ومنع الاستبدال عند الرفع المتزامن.
 
 نجحت الاختبارات محليًا على macOS. لم يُختبر الخادم الجديد على Raspberry Pi بعد؛ قبل اعتماد المرحلة على الجهاز:
 
@@ -141,3 +191,4 @@ backend/.venv/bin/python -m unittest discover -s backend/tests -v
 4. إذا لم تظهر النافذة شغّل الخادم من جلسة الشاشة نفسها وافحص `DISPLAY` أو `WAYLAND_DISPLAY` وصلاحيات المستخدم، دون تشغيله باستخدام root.
 
 مراجع: [MPV وخيارات JSON IPC](https://mpv.io/manual/stable/)، [FastAPI lifespan](https://fastapi.tiangolo.com/advanced/events/)، [اختبار دورة حياة الخادم](https://fastapi.tiangolo.com/advanced/testing-events/).
+الرفع التدريجي موضح في [Starlette Requests](https://starlette.dev/requests/)، وفحص المسارات في [FFprobe](https://ffmpeg.org/ffprobe.html).

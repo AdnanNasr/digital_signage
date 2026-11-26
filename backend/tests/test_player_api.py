@@ -19,6 +19,8 @@ REAL_POPEN = subprocess.Popen
 
 def headless_mpv(command, **kwargs):
     # Exercise the production IPC client without opening a desktop window.
+    if not any(arg.startswith("--input-ipc-server=") for arg in command):
+        return REAL_POPEN(command, **kwargs)
     command = [arg for arg in command if arg not in (
         "--fullscreen", "--force-window=immediate",
     )]

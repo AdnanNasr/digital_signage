@@ -33,6 +33,8 @@ class Settings:
     api_token: str
     mpv_binary: str = "mpv"
     ipc_timeout: float = 3.0
+    max_upload_bytes: int = 512 * 1024 * 1024
+    ffprobe_binary: str = "ffprobe"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -42,9 +44,14 @@ class Settings:
         token = load_api_token(runtime_dir)
         if len(token) < 32:
             raise ValueError("SIGNAGE_API_TOKEN muss mindestens 32 Zeichen enthalten.")
+        max_upload_mb = int(os.environ.get("SIGNAGE_MAX_UPLOAD_MB", "512"))
+        if max_upload_mb < 1:
+            raise ValueError("SIGNAGE_MAX_UPLOAD_MB muss mindestens 1 sein.")
         return cls(
             videos_dir=Path(os.environ.get("SIGNAGE_VIDEOS_DIR", str(get_path()))).resolve(),
             runtime_dir=runtime_dir,
             api_token=token,
             mpv_binary=os.environ.get("SIGNAGE_MPV_BINARY", "mpv"),
+            max_upload_bytes=max_upload_mb * 1024 * 1024,
+            ffprobe_binary=os.environ.get("SIGNAGE_FFPROBE_BINARY", "ffprobe"),
         )
