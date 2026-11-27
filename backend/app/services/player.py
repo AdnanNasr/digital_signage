@@ -13,6 +13,7 @@ from typing import Callable
 from python_project.main import get_videos
 
 from ..config import Settings
+from ..desktop_session import desktop_environment
 from ..media_types import MEDIA_EXTS, IMAGE_FORMATS
 
 logger = logging.getLogger(__name__)
@@ -97,7 +98,7 @@ class PlayerService:
                 f"--input-ipc-server={self.socket_path}",
                 f"--keepaspect={'no' if self.fit_mode == 'stretch' else 'yes'}",
                 f"--panscan={1 if self.fit_mode == 'cover' else 0}",
-            ], stdin=subprocess.DEVNULL)
+            ], stdin=subprocess.DEVNULL, env=desktop_environment())
         except OSError as error:
             raise PlayerError("MPV konnte nicht gestartet werden. Bitte Installation prüfen.") from error
         deadline = time.monotonic() + self.settings.ipc_timeout

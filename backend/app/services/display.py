@@ -12,6 +12,8 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Literal
 
+from ..desktop_session import desktop_environment
+
 logger = logging.getLogger(__name__)
 ROTATIONS = {0: 'normal', 90: 'left', 180: 'inverted', 270: 'right'}
 WLR_ROTATIONS = {0: 'normal', 90: '90', 180: '180', 270: '270'}
@@ -58,9 +60,10 @@ class DisplayService:
     @staticmethod
     def session():
         # Never use Xwayland's xrandr to configure physical Wayland outputs.
-        if os.environ.get('WAYLAND_DISPLAY') or os.environ.get('XDG_SESSION_TYPE') == 'wayland':
+        environment = desktop_environment()
+        if environment.get('WAYLAND_DISPLAY') or environment.get('XDG_SESSION_TYPE') == 'wayland':
             return 'wayland'
-        if os.environ.get('DISPLAY'):
+        if environment.get('DISPLAY'):
             return 'x11'
         return 'unsupported'
 
@@ -68,7 +71,7 @@ class DisplayService:
     def _run(args):
         try:
             result = subprocess.run(args, capture_output=True, text=True, timeout=5,
-                                    env={**os.environ, 'LC_ALL': 'C'}, check=False)
+                                    env={**desktop_environment(), 'LC_ALL': 'C'}, check=False)
         except FileNotFoundError as error:
             raise HTTPException(503, f'{args[0]} ist nicht installiert.') from error
         except (OSError, subprocess.TimeoutExpired) as error:
@@ -123,7 +126,7 @@ class DisplayService:
             return self.parse_wayland(self._run(['wlr-randr']))
         if session == 'x11':
             return self.parse_x11(self._run(['xrandr', '--query']))
-        raise HTTPException(503, 'Keine unterstützte Desktop-Sitzung. Bildschirmdrehung benötigt Wayland oder X11 auf dem Pi.')
+        raise HTTPException(503, 'Keine erreichbare Desktop-Sitzung gefunden. Bitte den Server als Benutzer des angemeldeten Pi-Desktops starten und WAYLAND_DISPLAY sowie XDG_RUNTIME_DIR prüfen.')
 
     def _output(self, outputs, name=None):
         target = name or self.saved['output']
@@ -143,7 +146,9 @@ class DisplayService:
             error = None
             outputs = []
             output = None
+            session = 'unsupported'
             try:
+                session = self.session()
                 outputs = self.outputs()
                 output = self._output(outputs)
             except HTTPException as failure:
@@ -157,7 +162,7 @@ class DisplayService:
                     'rotation': output['rotation'] if output else None,
                     'resolution': output['resolution'] if output else None,
                     'fit_mode': fit_mode,
-                    'session': self.session(), 'available': output is not None,
+                    'session': session, 'available': output is not None,
                     'outputs': outputs, 'saved': dict(self.saved),
                     'error': error or self.restore_error}
 
