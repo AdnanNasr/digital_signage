@@ -362,3 +362,77 @@ Wayland محليًا حدد `WAYLAND_DISPLAY` الصحيح صراحةً. إذا 
 للمخرجات، تحقق من تثبيت `wlr-randr` ودعم compositor لبروتوكول إدارة المخارج.
 
 مرجع متغيرات الاتصال: [توثيق Wayland الرسمي](https://wayland.freedesktop.org/docs/html/apb.html).
+
+
+### إذا شُغّل الخادم سابقًا باستخدام sudo
+
+الدخول إلى SSH باسم `admin` ثم تنفيذ `sudo python ...` يشغّل Python باسم root، وليس
+باسم admin. لا تستطيع هذه العملية استخدام الاكتشاف التلقائي لجلسة admin. يرفض ملف
+التشغيل ومدخل Uvicorn تشغيل الخادم باسم root برسالة مباشرة، قبل إنشاء ملفات runtime.
+
+أوقف الخادم القديم أولًا بـCtrl+C في Terminal التي تشغّله. إذا فتحت جلسة `sudo -i` أو
+`sudo su` فاستخدم `exit` للعودة إلى حساب admin، أو افتح اتصال SSH جديدًا بحساب admin.
+من جلسة admin نفّذ إصلاح الملكية مرة واحدة للمشروع الحالي، ثم شغّل الخادم دون sudo:
+
+```bash
+sudo chown -R admin:"$(id -gn admin)" /home/admin/werbungen/digital_signage
+cd /home/admin/werbungen/digital_signage
+backend/.venv/bin/python backend/run.py
+```
+
+أمر تغيير الملكية لا يحذف كلمة المرور أو القوائم أو الوسائط؛ يعيد ملكيتها إلى المستخدم الذي
+يشغّل الخادم. المسار أعلاه خاص بالتثبيت الحالي. تبقى sudo مطلوبة لأعمال النظام مثل تثبيت
+الحزم، بينما يعمل خادم المشروع والمشغّل بحساب مستخدم سطح المكتب.
+
+
+### العرض يعمل فقط بعد إيقاف lightdm
+
+لهذه الحالة استخدم جلسة العرض الرسومية لكل من MPV وإدارة اتجاه الشاشة. إيقاف lightdm قد
+ينهي compositor وجلسة Wayland؛ عندها قد يستطيع إخراج DRM المباشر عرض الوسائط، لكن لا
+تبقى جلسة تديرها `wlr-randr`. هذه آليتان مختلفتان للوصول إلى الشاشة.
+
+عند اكتشاف Wayland على Linux يضبط الخادم MPV صراحةً إلى:
+
+```text
+--vo=gpu --gpu-api=opengl --gpu-context=wayland
+```
+
+يستخدم المشغل نافذة fullscreen داخل compositor، وتُطبق أوامر الدوران على مخرج الجلسة نفسها.
+إذا فشل فتح نافذة Wayland، لا يعيد المحاولة بمخرج DRM. تظهر أخطاء MPV وتحذيراته في
+Terminal الخادم، مع تعطيل إدخال لوحة مفاتيح Terminal وشريط حالة التشغيل المتكرر.
+لا يتغير اختيار الإخراج الافتراضي على macOS أو X11 بهذا التعديل.
+
+على الـPi، أوقف خادم المشروع الحالي أولًا، ثم نفّذ من SSH بحساب admin:
+
+```bash
+sudo systemctl start lightdm
+```
+
+انتظر ظهور سطح المكتب على الشاشة، وسجل الدخول إليه بحساب admin إن ظهرت شاشة تسجيل الدخول.
+مجرد كون الخدمة active لا يعني وجود جلسة Wayland للمستخدم admin؛ شاشة الدخول وحدها لا تكفي.
+بعد ذلك حدّث الخادم وشغّله **دون sudo**:
+
+```bash
+cd /home/admin/werbungen/digital_signage
+git fetch origin
+git switch enhancment
+git pull --ff-only origin enhancment
+backend/.venv/bin/python backend/run.py
+```
+
+اختبر بدء الوسائط وتدوير الشاشة مع بقاء lightdm وجلسة سطح المكتب قيد التشغيل. لا يحتاج هذا
+التحديث بناء Flutter. يظل الاختبار الفعلي على Pi مطلوبًا؛ الاختبارات المحلية تتحقق من
+وسائط التشغيل ومن MPV بمخرج null، ولا تثبت أن نافذة Wayland ظهرت على HDMI.
+
+إذا استمر السواد، احتفظ بالخادم في Terminal أمامك وانسخ أخطاء MPV الظاهرة عند بدء العرض،
+مع نتائج الأوامر التالية أثناء تشغيل lightdm:
+
+```bash
+whoami
+systemctl is-active lightdm
+loginctl list-sessions
+mpv --version
+mpv --gpu-context=help
+```
+
+توثيق المخارج: [gpu-context في دليل MPV](https://mpv.io/manual/stable/#options-gpu-context).

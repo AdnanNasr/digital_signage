@@ -3,6 +3,7 @@ import json
 import logging
 import socket
 import subprocess
+import sys
 import threading
 import time
 from contextlib import contextmanager
@@ -83,22 +84,36 @@ class PlayerService:
             raise PlayerError("Der Player ist nicht erreichbar.") from error
         raise PlayerError("Der Player hat die Verbindung geschlossen.")
 
+    @staticmethod
+    def _video_output_options(environment: dict[str, str]) -> list[str]:
+        # Use a compositor window on Wayland; never let GPU probing pick DRM
+        # and compete with the desktop for direct access to the monitor.
+        if sys.platform.startswith('linux') and (
+            environment.get('WAYLAND_DISPLAY') or environment.get('XDG_SESSION_TYPE') == 'wayland'
+        ):
+            return ['--vo=gpu', '--gpu-api=opengl', '--gpu-context=wayland']
+        return []
+
     def _ensure_running(self) -> None:
         if self._process is not None and self._process.poll() is None:
             return
         if self._ownership is None:
             raise PlayerError("Der Player-Dienst wurde nicht initialisiert.")
         self.socket_path.unlink(missing_ok=True)
+        environment = desktop_environment()
+        output_options = self._video_output_options(environment)
         try:
             self._process = subprocess.Popen([
                 self.settings.mpv_binary,
                 "--no-config", "--fullscreen", "--loop-playlist=inf", "--no-audio",
                 "--idle=yes", "--force-window=immediate", "--background-color=#000000",
-                "--no-terminal", "--osc=no", "--osd-level=0", "--input-default-bindings=no",
+                "--terminal=yes", "--input-terminal=no", "--msg-color=no", "--msg-level=all=warn",
+                "--quiet", "--osc=no", "--osd-level=0", "--input-default-bindings=no",
+                *output_options,
                 f"--input-ipc-server={self.socket_path}",
                 f"--keepaspect={'no' if self.fit_mode == 'stretch' else 'yes'}",
                 f"--panscan={1 if self.fit_mode == 'cover' else 0}",
-            ], stdin=subprocess.DEVNULL, env=desktop_environment())
+            ], stdin=subprocess.DEVNULL, env=environment)
         except OSError as error:
             raise PlayerError("MPV konnte nicht gestartet werden. Bitte Installation prüfen.") from error
         deadline = time.monotonic() + self.settings.ipc_timeout
@@ -111,7 +126,10 @@ class PlayerService:
             except PlayerError:
                 time.sleep(0.05)
         self._terminate()
-        raise PlayerError("MPV ist nicht bereit. Bitte die Bildschirm-Sitzung prüfen.")
+        message = ("MPV konnte das Wayland-Fenster nicht öffnen. Bitte die laufende Desktop-Sitzung "
+                   "und die MPV-Fehlermeldungen im Server-Terminal prüfen."
+                   if output_options else "MPV ist nicht bereit. Bitte die Bildschirm-Sitzung prüfen.")
+        raise PlayerError(message)
 
     def current_fit_mode(self) -> str:
         with self._lock:

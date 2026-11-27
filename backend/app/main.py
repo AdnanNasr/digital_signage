@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .config import Settings, get_allowed_origins
+from .desktop_session import require_desktop_user
 from .routes.player import router
 from .routes.media import router as media_router
 from .routes.playlists import router as playlists_router
@@ -25,6 +26,7 @@ bearer = HTTPBearer(auto_error=False)
 def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        require_desktop_user()
         app.state.settings = settings or Settings.from_env()
         player = PlayerService(app.state.settings)
         player.open()
