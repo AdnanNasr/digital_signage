@@ -267,8 +267,12 @@ sudo apt install wlr-randr x11-xserver-utils
 يختار الخادم `wlr-randr` عند وجود جلسة Wayland، أو `xrandr --query` عند وجود جلسة X11.
 لا يستخدم Xwayland بديلًا لتدوير شاشة Wayland. يجب أن يدعم compositor في Wayland
 بروتوكول `wlr-output-management`، مثل بيئات Pi المتوافقة. وجود الأداة وحده لا يكفي.
-لا تُخمن قيم `WAYLAND_DISPLAY` أو `DISPLAY` أو `XDG_RUNTIME_DIR`؛ يجب أن يرثها الخادم
-من جلسة المستخدم نفسها. الجلسة عبر SSH وحدها لا تضمن توفر هذه البيئة.
+يحترم الخادم قيم `WAYLAND_DISPLAY` و`DISPLAY` المحددة صراحةً. عند تشغيله من SSH دون
+متغيرات سطح المكتب، يكتشف مقبس Wayland الحي الخاص بالمستخدم نفسه في `XDG_RUNTIME_DIR`،
+أو في `/run/user/<uid>` عند غياب المتغير. يتحقق من ملكية المجلد والمقبس ويرفض الروابط
+الرمزية والمقابس القديمة. يمرر البيئة المكتشفة إلى `wlr-randr` وMPV دون تغيير بيئة الخادم عالميًا.
+لا يبحث في جلسات مستخدمين آخرين ولا يكتشف جلسة سطح المكتب تلقائيًا بحساب root.
+إذا وجد أكثر من مقبس حي، يطلب تحديد `WAYLAND_DISPLAY` صراحةً بدل اختيار جلسة عشوائية.
 على macOS أو خادم دون جلسة رسومية يظهر أن تدوير الشاشة غير متاح، وتبقى ملاءمة MPV قابلة للضبط.
 
 تُحفظ الإعدادات في `backend/runtime/display.json`، مع استبدال ذري للملف بعد التحقق من
@@ -328,3 +332,33 @@ sudo apt install wlr-randr x11-xserver-utils
 [أداة wlr-randr](https://gitlab.freedesktop.org/emersion/wlr-randr)،
 [دليل xrandr](https://www.x.org/releases/current/doc/man/man1/xrandr.1.xhtml)،
 [إعداد Raspberry Pi وملف autostart](https://www.raspberrypi.com/documentation/computers/configuration.html).
+
+
+### تشغيل الخادم من SSH مع Wayland
+
+اتصل بحساب المستخدم الذي سجل الدخول إلى سطح مكتب الـPi، مثل `admin`. يجب أن يكون سطح
+المكتب مفتوحًا؛ SSH لا ينشئ جلسة Wayland جديدة. أوقف نسخة الخادم القديمة ثم نفّذ:
+
+```bash
+cd /home/admin/werbungen/digital_signage
+git pull --ff-only origin enhancment
+backend/.venv/bin/python backend/run.py
+```
+
+هذا الإصلاح يخص الخادم فقط؛ لا يحتاج إلى بناء Flutter مجددًا. إذا لم تُكتشف الجلسة، افحص من
+SSH بحساب المستخدم نفسه (الأوامر التالية لا تعرض كلمة المرور):
+
+```bash
+whoami
+printf 'session=%s runtime=%s wayland=%s display=%s\n' "$XDG_SESSION_TYPE" "$XDG_RUNTIME_DIR" "$WAYLAND_DISPLAY" "$DISPLAY"
+find "/run/user/$(id -u)" -maxdepth 1 -type s -name 'wayland-*' -print
+```
+
+عند وجود أكثر من جلسة، حدد اسم المقبس الصحيح الذي أظهره الفحص، ثم شغّل الخادم في Terminal
+نفسه بعد `export WAYLAND_DISPLAY=<actual-socket-name>` و
+`export XDG_RUNTIME_DIR=/run/user/$(id -u)`؛ لا تفترض أن الاسم `wayland-0` أو `wayland-1`.
+إذا كان هناك `DISPLAY` صريح لجلسة X11 أو SSH X forwarding، يحترمه الخادم؛ عند استهداف
+Wayland محليًا حدد `WAYLAND_DISPLAY` الصحيح صراحةً. إذا اكتُشفت الجلسة وتعذر الوصول
+للمخرجات، تحقق من تثبيت `wlr-randr` ودعم compositor لبروتوكول إدارة المخارج.
+
+مرجع متغيرات الاتصال: [توثيق Wayland الرسمي](https://wayland.freedesktop.org/docs/html/apb.html).
