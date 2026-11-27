@@ -362,3 +362,24 @@ Wayland محليًا حدد `WAYLAND_DISPLAY` الصحيح صراحةً. إذا 
 للمخرجات، تحقق من تثبيت `wlr-randr` ودعم compositor لبروتوكول إدارة المخارج.
 
 مرجع متغيرات الاتصال: [توثيق Wayland الرسمي](https://wayland.freedesktop.org/docs/html/apb.html).
+
+
+### إذا شُغّل الخادم سابقًا باستخدام sudo
+
+الدخول إلى SSH باسم `admin` ثم تنفيذ `sudo python ...` يشغّل Python باسم root، وليس
+باسم admin. لا تستطيع هذه العملية استخدام الاكتشاف التلقائي لجلسة admin. يرفض ملف
+التشغيل ومدخل Uvicorn تشغيل الخادم باسم root برسالة مباشرة، قبل إنشاء ملفات runtime.
+
+أوقف الخادم القديم أولًا بـCtrl+C في Terminal التي تشغّله. إذا فتحت جلسة `sudo -i` أو
+`sudo su` فاستخدم `exit` للعودة إلى حساب admin، أو افتح اتصال SSH جديدًا بحساب admin.
+من جلسة admin نفّذ إصلاح الملكية مرة واحدة للمشروع الحالي، ثم شغّل الخادم دون sudo:
+
+```bash
+sudo chown -R admin:"$(id -gn admin)" /home/admin/werbungen/digital_signage
+cd /home/admin/werbungen/digital_signage
+backend/.venv/bin/python backend/run.py
+```
+
+أمر تغيير الملكية لا يحذف كلمة المرور أو القوائم أو الوسائط؛ يعيد ملكيتها إلى المستخدم الذي
+يشغّل الخادم. المسار أعلاه خاص بالتثبيت الحالي. تبقى sudo مطلوبة لأعمال النظام مثل تثبيت
+الحزم، بينما يعمل خادم المشروع والمشغّل بحساب مستخدم سطح المكتب.

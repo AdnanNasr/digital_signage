@@ -7,6 +7,16 @@ from pathlib import Path
 from fastapi import HTTPException
 
 
+def require_desktop_user() -> None:
+    if os.geteuid() == 0:
+        raise RuntimeError(
+            'Der Server darf nicht als root laufen. Bitte ohne sudo als Benutzer '
+            'des angemeldeten Pi-Desktops starten: backend/.venv/bin/python backend/run.py. '
+            'Falls Dateien zuvor mit sudo erstellt wurden, muss ihr Besitzer zuerst '
+            'auf den Desktop-Benutzer korrigiert werden.'
+        )
+
+
 def _runtime_directory() -> Path | None:
     uid = os.geteuid()
     if uid == 0:
